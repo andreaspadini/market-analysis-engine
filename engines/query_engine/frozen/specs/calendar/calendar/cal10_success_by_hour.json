@@ -1,0 +1,14 @@
+{
+  "name": "cal10_success_by_hour",
+  "dataset": "df_master_enriched",
+  "filters": [],
+  "groupby": ["hour"],
+  "metrics": [
+    { "kind": "count", "alias": "n" },
+    { "kind": "prob", "col": "success_1ATR", "alias": "p_success_1ATR" }
+  ],
+  "order_by": [["p_success_1ATR", "desc"]],
+  "limit": null,
+  "timezone": null,
+  "include_time_views": false
+}

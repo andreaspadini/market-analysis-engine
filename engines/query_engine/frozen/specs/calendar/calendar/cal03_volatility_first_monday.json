@@ -1,0 +1,39 @@
+{
+  "name": "cal03_volatility_first_monday",
+  "dataset": "df_master_enriched",
+  "filters": [
+    {
+      "col": "weekday",
+      "op": "==",
+      "value": "Monday"
+    },
+    {
+      "col": "day_of_month",
+      "op": "<=",
+      "value": 7
+    }
+  ],
+  "groupby": [
+    "month"
+  ],
+  "metrics": [
+    {
+      "kind": "count",
+      "alias": "n"
+    },
+    {
+      "kind": "mean",
+      "col": "atr_before",
+      "alias": "avg_atr_before_pts"
+    }
+  ],
+  "order_by": [
+    [
+      "month",
+      "asc"
+    ]
+  ],
+  "limit": null,
+  "timezone": null,
+  "include_time_views": false
+}

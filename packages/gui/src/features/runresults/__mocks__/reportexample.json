@@ -1,0 +1,42 @@
+{
+  "meta": {
+    "metric": "distribution",
+    "filters": [],
+    "group_by": ["session_calc"],
+    "value_field": "breakout_outcome",
+    "target_field": null,
+    "success_condition": null,
+    "event_predicate": null,
+    "condition_predicate": null,
+    "normalization": "none",
+    "score_metric": null,
+    "sort_direction": null
+  },
+  "summary": {
+    "rows_total": 89,
+    "rows_valid": 89
+  },
+  "data": [
+    {
+      "group_key": { "session_calc": "asia" },
+      "rows_total": 39,
+      "rows_valid": 39,
+      "result": {
+        "false_breakout": 31,
+        "failed_follow_through": 4,
+        "true_breakout": 4
+      }
+    },
+    {
+      "group_key": { "session_calc": "ny" },
+      "rows_total": 25,
+      "rows_valid": 25,
+      "result": {
+        "false_breakout": 21,
+        "failed_follow_through": 3,
+        "true_breakout": 1
+      }
+    }
+  ],
+  "ranking": null
+}

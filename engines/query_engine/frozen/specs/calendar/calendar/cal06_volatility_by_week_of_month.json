@@ -1,0 +1,28 @@
+{
+  "name": "cal06_volatility_by_week_of_month",
+  "dataset": "df_master_enriched",
+  "filters": [],
+  "groupby": [
+    "week_of_month"
+  ],
+  "metrics": [
+    {
+      "kind": "count",
+      "alias": "n"
+    },
+    {
+      "kind": "mean",
+      "col": "atr_before",
+      "alias": "avg_atr_before_pts"
+    }
+  ],
+  "order_by": [
+    [
+      "week_of_month",
+      "asc"
+    ]
+  ],
+  "limit": null,
+  "timezone": null,
+  "include_time_views": false
+}

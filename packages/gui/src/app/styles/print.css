@@ -1,0 +1,50 @@
+/* Print foundation — safe defaults, no export buttons in G1 */
+@media print{
+  :root{
+    --bg:#fff;
+    --panel:#fff;
+    --panel-2:#fff;
+    --text:#000;
+    --muted:#333;
+    --border: rgba(0,0,0,.18);
+    --shadow:none;
+  }
+
+  body{
+    background:#fff !important;
+    color:#000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .no-print{ display:none !important; }
+  .print-only{ display:block !important; }
+
+  /* remove app chrome */
+  .app-shell__sidebar,
+  .app-shell__header,
+  .page-shell__actions{
+    display:none !important;
+  }
+
+  .app-shell{
+    grid-template-columns: 1fr !important;
+  }
+  .app-shell__content{
+    padding: 0 !important;
+  }
+  .container{
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .print-section{
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-table{
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+}
+.print-only{ display:none; }

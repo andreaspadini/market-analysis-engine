@@ -1,0 +1,167 @@
+{
+  "tool_id": "root_engine",
+  "counts": {
+    "balances": 106,
+    "breakouts": 89,
+    "bars": 5500
+  },
+  "events": [
+    {
+      "breakout_id": "bo_103_5484",
+      "breakout_time": "2025-11-30T22:45:00",
+      "breakout_price": 25265.75,
+      "breakout_type": "failed_follow_through",
+      "direction": "up",
+      "boundary_type": "upper",
+      "boundary_price": 25261.25,
+
+      "instrument": "MNQ",
+      "symbol": null,
+      "timeframe": "5m",
+      "version": "0.2.0",
+
+      "balance_high": 25267.5,
+      "balance_low": 25251.5,
+      "balance_midpoint": 25259.5,
+      "balance_range_size": 16.0,
+      "balance_vpoc": 25258.27,
+      "parent_balance_id": "balance_103",
+
+      "confirmation_status": "pending",
+      "is_failed": true,
+      "is_retest_occurred": false,
+
+      "initial_volume": 4366,
+      "initial_delta": 714,
+
+      "follow_through": {
+        "failure_price": 25258.0,
+        "retracement_depth": 43.25,
+        "retracement_bars": 14
+      },
+
+      "pre_breakout_signal": {
+        "total_score": 0.67,
+        "compression_score": 0.57,
+        "volatility_score": 0.74
+      },
+
+      "rotation_context": {
+        "total_rotations": 2,
+        "directional_bias": 0.0
+      },
+
+      "strength_components": {
+        "overall_strength_score": 2.63,
+        "overall_strength_normalized": 0.43
+      },
+
+      "tags": ["failed_follow_through", "volatility_confirmed"]
+    },
+
+    {
+      "breakout_id": "bo_104_5489",
+      "breakout_time": "2025-11-30T23:10:00",
+      "breakout_price": 25249.75,
+      "breakout_type": "false_breakout",
+      "direction": "down",
+      "boundary_type": "lower",
+      "boundary_price": 25251.5,
+
+      "instrument": "MNQ",
+      "symbol": null,
+      "timeframe": "5m",
+      "version": "0.2.0",
+
+      "balance_high": 25267.5,
+      "balance_low": 25251.5,
+      "balance_midpoint": 25259.5,
+      "balance_range_size": 16.0,
+      "balance_vpoc": 25258.27,
+      "parent_balance_id": "balance_104",
+
+      "confirmation_status": "pending",
+      "is_failed": true,
+      "is_retest_occurred": false,
+
+      "initial_volume": 2033,
+      "initial_delta": -271,
+
+      "follow_through": {
+        "failure_price": 25253.5,
+        "retracement_depth": 39.75,
+        "retracement_bars": 4
+      },
+
+      "pre_breakout_signal": {
+        "total_score": 0.57,
+        "compression_score": 0.75,
+        "volatility_score": 0.13
+      },
+
+      "rotation_context": {
+        "total_rotations": 2,
+        "directional_bias": 0.0
+      },
+
+      "strength_components": {
+        "overall_strength_score": 2.23,
+        "overall_strength_normalized": 0.37
+      },
+
+      "tags": ["false_breakout", "volatility_confirmed"]
+    },
+
+    {
+      "breakout_id": "bo_105_5497",
+      "breakout_time": "2025-11-30T23:50:00",
+      "breakout_price": 25239.25,
+      "breakout_type": "clean",
+      "direction": "down",
+      "boundary_type": "lower",
+      "boundary_price": 25242.0,
+
+      "instrument": "MNQ",
+      "symbol": null,
+      "timeframe": "5m",
+      "version": "0.2.0",
+
+      "balance_high": 25261.75,
+      "balance_low": 25242.0,
+      "balance_midpoint": 25251.875,
+      "balance_range_size": 19.75,
+      "balance_vpoc": 25248.27,
+      "parent_balance_id": "balance_105",
+
+      "confirmation_status": "pending",
+      "is_failed": false,
+      "is_retest_occurred": false,
+
+      "initial_volume": 2358,
+      "initial_delta": -426,
+
+      "follow_through": {
+        "retracement_depth": 13.75,
+        "retracement_bars": 0
+      },
+
+      "pre_breakout_signal": {
+        "total_score": 0.69,
+        "compression_score": 0.63,
+        "volatility_score": 0.67
+      },
+
+      "rotation_context": {
+        "total_rotations": 3,
+        "directional_bias": 0.33
+      },
+
+      "strength_components": {
+        "overall_strength_score": 2.38,
+        "overall_strength_normalized": 0.39
+      },
+
+      "tags": ["clean", "volatility_confirmed"]
+    }
+  ]
+}

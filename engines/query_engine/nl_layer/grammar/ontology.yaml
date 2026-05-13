@@ -1,0 +1,131 @@
+enums:
+  session:
+    asia: ["asia", "asiatica"]
+    europe: ["europa", "europe", "eu"]
+    usa: ["usa", "america", "us", "usa session"]
+
+  level:
+    vah: ["vah", "value area high"]
+    val: ["val", "value area low"]
+    poc: ["poc", "point of control"]
+    vwap: ["vwap"]
+
+  side:
+    above: ["above", "sopra", "over"]
+    below: ["below", "sotto", "under"]
+
+  mode:
+    nearest: ["nearest", "piu vicino", "più vicino"]
+    at_least: ["at_least", "at least", "almeno", "minimo"]
+
+  month:
+    "1":  ["january", "jan", "gennaio", "gen"]
+    "2":  ["february", "feb", "febbraio"]
+    "3":  ["march", "mar", "marzo"]
+    "4":  ["april", "apr", "aprile"]
+    "5":  ["may", "maggio", "mag"]
+    "6":  ["june", "jun", "giugno", "giu"]
+    "7":  ["july", "jul", "luglio", "lug"]
+    "8":  ["august", "aug", "agosto", "ago"]
+    "9":  ["september", "sep", "settembre", "set"]
+    "10": ["october", "oct", "ottobre", "ott"]
+    "11": ["november", "nov", "novembre"]
+    "12": ["december", "dec", "dicembre", "dic"]
+
+  day_of_month:
+    "1":  ["01", "primo", "prima", "il primo", "giorno 1", "il 1"]
+    "2":  ["02", "secondo", "seconda", "il secondo", "giorno 2", "il 2"]
+    "3":  ["03", "terzo", "terza", "il terzo", "giorno 3", "il 3"]
+    "4":  ["04", "quarto", "quarta", "il quarto", "giorno 4", "il 4"]
+    "5":  ["05", "quinto", "quinta", "il quinto", "giorno 5", "il 5"]
+    "6":  ["06", "sesto", "sesta", "il sesto", "giorno 6", "il 6"]
+    "7":  ["07", "settimo", "settima", "il settimo", "giorno 7", "il 7"]
+    "8":  ["08", "ottavo", "ottava", "l'ottavo", "il ottavo", "giorno 8", "il 8"]
+    "9":  ["09", "nono", "nona", "il nono", "giorno 9", "il 9"]
+    "10": ["10°", "decimo", "decima", "il decimo", "giorno 10", "il 10"]
+    "11": ["11°", "undicesimo", "undicesima", "l'undicesimo", "giorno 11", "il 11"]
+    "12": ["12°", "dodicesimo", "dodicesima", "il dodicesimo", "giorno 12", "il 12"]
+    "13": ["13°", "tredicesimo", "tredicesima", "il tredicesimo", "giorno 13", "il 13"]
+    "14": ["14°", "quattordicesimo", "quattordicesima", "il quattordicesimo", "giorno 14", "il 14"]
+    "15": ["15°", "quindicesimo", "quindicesima", "il quindicesimo", "giorno 15", "il 15"]
+    "16": ["16°", "sedicesimo", "sedicesima", "il sedicesimo", "giorno 16", "il 16"]
+    "17": ["17°", "diciassettesimo", "diciassettesima", "il diciassettesimo", "giorno 17", "il 17"]
+    "18": ["18°", "diciottesimo", "diciottesima", "il diciottesimo", "giorno 18", "il 18"]
+    "19": ["19°", "diciannovesimo", "diciannovesima", "il diciannovesimo", "giorno 19", "il 19"]
+    "20": ["20°", "ventesimo", "ventesima", "il ventesimo", "giorno 20", "il 20"]
+    "21": ["21°", "ventunesimo", "ventunesima", "il ventunesimo", "giorno 21", "il 21"]
+    "22": ["22°", "ventiduesimo", "ventiduesima", "il ventiduesimo", "giorno 22", "il 22"]
+    "23": ["23°", "ventitreesimo", "ventitreesima", "il ventitreesimo", "giorno 23", "il 23"]
+    "24": ["24°", "ventiquattresimo", "ventiquattresima", "il ventiquattresimo", "giorno 24", "il 24"]
+    "25": ["25°", "venticinquesimo", "venticinquesima", "il venticinquesimo", "giorno 25", "il 25"]
+    "26": ["26°", "ventiseiesimo", "ventiseiesima", "il ventiseiesimo", "giorno 26", "il 26"]
+    "27": ["27°", "ventisettesimo", "ventisettesima", "il ventisettesimo", "giorno 27", "il 27"]
+    "28": ["28°", "ventottesimo", "ventottesima", "il ventottesimo", "giorno 28", "il 28"]
+    "29": ["29°", "ventinovesimo", "ventinovesima", "il ventinovesimo", "giorno 29", "il 29"]
+    "30": ["30°", "trentesimo", "trentesima", "il trentesimo", "giorno 30", "il 30"]
+    "31": ["31°", "trentunesimo", "trentunesima", "il trentunesimo", "giorno 31", "il 31"]
+
+
+  week_of_month:
+    "1": ["1", "prima", "primo", "prima settimana", "first", "1st", "week 1"]
+    "2": ["2", "seconda", "secondo", "seconda settimana", "second", "2nd", "week 2"]
+    "3": ["3", "terza", "terzo", "terza settimana", "third", "3rd", "week 3"]
+    "4": ["4", "quarta", "quarto", "quarta settimana", "fourth", "4th", "week 4"]
+    "5": ["5", "quinta", "quinto", "quinta settimana", "fifth", "5th", "week 5"]
+
+  hour:
+    "0":  ["00:00", "mezzanotte", "midnight", "h0", "ore 0", "0"]
+    "1":  ["01:00", "h1", "ore 1", "1"]
+    "2":  ["02:00", "h2", "ore 2", "2"]
+    "3":  ["03:00", "h3", "ore 3", "3"]
+    "4":  ["04:00", "h4", "ore 4", "4"]
+    "5":  ["05:00", "h5", "ore 5", "5"]
+    "6":  ["06:00", "h6", "ore 6", "6"]
+    "7":  ["07:00", "h7", "ore 7", "7"]
+    "8":  ["08:00", "h8", "ore 8", "8"]
+    "9":  ["09:00", "h9", "ore 9", "9"]
+    "10": ["10:00", "h10", "ore 10", "10"]
+    "11": ["11:00", "h11", "ore11", "11"]
+    "12": ["12:00", "h12", "mezzogiorno", "noon", "12", "ore 12"]
+    "13": ["13:00", "h13", "ore 13", "13"]
+    "14": ["14:00", "h14", "ore 14", "14"]
+    "15": ["15:00", "h15", "ore 15", "15"]
+    "16": ["16:00", "h16", "ore 16", "16"]
+    "17": ["17:00", "h17", "ore 17", "17"]
+    "18": ["18:00", "h18", "ore 18", "18"]
+    "19": ["19:00", "h19", "ore 19", "19"]
+    "20": ["20:00", "h20", "ore 20", "20"]
+    "21": ["21:00", "h21", "ore 21", "21"]
+    "22": ["22:00", "h22", "ore 22", "22"]
+    "23": ["23:00", "h23", "ore 23", "23"]
+
+
+  weekday:
+    mon: ["lun", "lunedì", "lunedi", "monday", "mon"]
+    tue: ["mar", "martedì", "martedi", "tuesday", "tue"]
+    wed: ["mer", "mercoledì", "mercoledi", "wednesday", "wed"]
+    thu: ["gio", "giovedì", "giovedi", "thursday", "thu"]
+    fri: ["ven", "venerdì", "venerdi", "friday", "fri"]
+    sat: ["sab", "sabato", "saturday", "sat"]
+    sun: ["dom", "domenica", "sunday", "sun"]
+
+  weekday_calendar:
+    Monday: ["lun", "lunedì", "lunedi", "monday", "mon"]
+    Tuesday: ["mar", "martedì", "martedi", "tuesday", "tue"]
+    Wednesday: ["mer", "mercoledì", "mercoledi", "wednesday", "wed"]
+    Thursday: ["gio", "giovedì", "giovedi", "thursday", "thu"]
+    Friday: ["ven", "venerdì", "venerdi", "friday", "fri"]
+    Saturday: ["sab", "sabato", "saturday", "sat"]
+    Sunday: ["dom", "domenica", "sunday", "sun"]
+
+
+regex:
+  minutes: '(?P<minutes>\d{1,3})\s*(m|min|minutes|minuti)\b'
+  wbucket: '\b(w\d{4}_\d{4})\b'
+  qbucket: '\b(q[1-4]_(low|midlow|midhigh|high))\b'
+
+keywords:
+  win03: ["win03", "combo", "combinazione", "window", "vol", "volume", "delta"]
+  time_confirm: ["primo close", "time confirm", "conferma", "timing", "dopo quanti", "minutes to close"]
+  retest: ["retest", "ritest", "ritesto"]
+  success: ["successo", "success", "win rate", "probabilità di successo", "p_success"]

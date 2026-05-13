@@ -1,0 +1,14 @@
+{
+  "name": "cal11_volatility_by_day_of_month",
+  "dataset": "df_master_enriched",
+  "filters": [],
+  "groupby": ["day_of_month"],
+  "metrics": [
+    { "kind": "count", "alias": "n" },
+    { "kind": "mean", "col": "atr_before", "alias": "avg_atr_before_pts" }
+  ],
+  "order_by": [["avg_atr_before_pts", "desc"]],
+  "limit": null,
+  "timezone": null,
+  "include_time_views": false
+}

@@ -1,0 +1,36 @@
+dataset:
+  dataset_id: mnq_1m_2025-11-01_2025-12-31
+  end_date: '2025-12-31'
+  instruments:
+  - MNQ
+  start_date: '2025-11-01'
+  timeframe: 1m
+config:
+  candles:
+  - body_ticks: 10.0
+    close_position: near_high
+    delta: 300.0
+    direction: bullish
+    index: 1
+    lower_wick_ticks: 4.0
+    upper_wick_ticks: 2.0
+    volume: 1200.0
+  - body_ticks: 8.0
+    close_position: near_low
+    delta: -150.0
+    direction: bearish
+    index: 2
+    lower_wick_ticks: 2.0
+    upper_wick_ticks: 3.0
+    volume: 900.0
+  length_bars: 2
+  mode: manual_template
+  tick_size: 0.25
+  tolerance:
+    body_ticks_pct: 0.5
+    delta_pct: 1.0
+    volume_pct: 1.0
+    wick_ticks_pct: 1.0
+  visualization:
+    context_after_bars: 40
+    context_before_bars: 20

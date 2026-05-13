@@ -1,0 +1,835 @@
+  - id: rule_win03_combo
+    priority: 100
+    triggers_any: ["combo", "combinazione", "win03"]
+    maps_to:
+      type: intent
+      intent_id: win03_success_by_bucket_and_init_vol_delta_report
+    required_slots: ["wbucket", "volbucket", "deltabucket"]
+
+  - id: rule_lv01_level_acceptance
+    priority: 95
+
+    slots:
+      level: { required: true }
+      side: { required: true }
+      minutes: { required: true }
+
+    maps_to:
+      type: intent
+      intent_id: prev_day_level_acceptance_h60
+      params_from_slots:
+        level: level
+        side: side
+        minutes: minutes
+
+    patterns:
+      # acceptance ITA (con keyword "accettazione" -> deve vincere su LV04)
+      - "accettazione vah sopra 10m"
+      - "accettazione val sotto 10m"
+      - "accettazione sopra vah 10m"
+      - "accettazione sotto val 10m"
+      - "accettazione vah sopra 10 min"
+      - "accettazione val sotto 10 min"
+      - "accettazione vah sopra 10 minuti"
+      - "accettazione val sotto 10 minuti"
+      - "accettazione sopra vah 10 min"
+      - "accettazione sotto val 10 min"
+      - "accettazione sopra vah 10 minuti"
+      - "accettazione sotto val 10 minuti"
+      - "accettazione vwap sopra 10m"
+      - "accettazione poc entro 5m"
+      - "accettazione poc sopra entro 5m"
+      - "accettazione poc sotto entro 5m"
+
+      # acceptance EN (con keyword "acceptance")
+      - "acceptance vah above 10m"
+      - "acceptance val below 10m"
+      - "acceptance above vah 10m"
+      - "acceptance below val 10m"
+      - "acceptance vah above 10 minutes"
+      - "acceptance val below 10 minutes"
+      - "acceptance vwap above 10m"
+      - "acceptance poc within 5m"
+      - "acceptance poc above within 5m"
+      - "acceptance poc below within 5m"
+
+      # esplicito lv01 (dev-style)
+      - "lv01 vah above 10m"
+      - "lv01 val below 10m"
+
+    patterns_regex:
+    - "(?i)\\b(accettazione|acceptance)\\b.*\\b(vah|val|vwap|poc)\\b.*\\b(sopra|above|sotto|below)\\b.*\\b(entro|within)?\\s*\\d{1,3}\\s*(m|min|minutes|minuti)\\b"
+    - "(?i)\\b(accettazione|acceptance)\\b.*\\b(sopra|above|sotto|below)\\b.*\\b(vah|val|vwap|poc)\\b.*\\b(entro|within)?\\s*\\d{1,3}\\s*(m|min|minutes|minuti)\\b"
+
+  - id: rule_lv01_level_acceptance_missing_side
+    priority: 96
+
+    # stessa intent, ma quando manca side vogliamo un messaggio mirato
+    maps_to:
+      type: intent
+      intent_id: prev_day_level_acceptance_h60
+      params_from_slots:
+        level: level
+        minutes: minutes
+
+    # qui NON richiediamo side (così non fallisce per missing_slot a livello rule-match)
+    slots:
+      level: { required: true }
+      minutes: { required: true }
+
+    patterns:
+      - "accettazione poc entro 5m"
+      - "acceptance poc within 5m"
+
+    forbidden_terms:
+      - "p("
+      - "|"
+      - "p_success"
+      - "probabilità"
+      - "probabilita"
+      - "condizionato"
+      - "conditional"
+      - "success |"
+      - "successo |"
+
+
+    patterns_regex:
+      - "(?i)^(?!.*\\bp\\s*\\().*(?<!\\w)(accettazione|acceptance)(?!\\w).*\\bpoc\\b.*\\b(entro|within)\\b\\s*\\d{1,3}\\s*(m|min|minutes|minuti)\\b"
+
+
+
+  - id: rule_level_time_confirm
+    priority: 90
+
+    slots:
+      level: { required: true }
+      side: { required: true }
+      minutes: { required: true }
+      mode: { required: false, default: "nearest" }
+
+    maps_to:
+      type: intent
+      intent_id: level_time_confirm_h60
+      params_from_slots:
+        level: level
+        side: side
+        minutes: minutes
+        mode: mode
+
+    patterns:
+      # shorthand ITA (quelli dei test)
+      - "vah sopra 10m"
+      - "val sotto 10m"
+
+      # timing ITA (brevi / naturali)
+      - "sopra vah 10m"
+      - "sotto val 10m"
+      - "vah sopra 10 min"
+      - "val sotto 10 min"
+      - "vah sopra 10 minuti"
+      - "val sotto 10 minuti"
+
+      # timing ITA con "primo close" / "tempo" (senza mode)
+      - "primo close sopra vah 10m"
+      - "primo close sotto val 10m"
+      - "tempo sopra vah 10m"
+      - "tempo sotto val 10m"
+
+      # timing ITA con "entro"
+      - "primo close sopra vah entro 10m"
+      - "primo close sotto val entro 10m"
+      - "tempo sopra vah entro 10m"
+      - "tempo sotto val entro 10m"
+
+      # timing EN (brevi / naturali)
+      - "vah above 10m"
+      - "val below 10m"
+      - "above vah 10m"
+      - "below val 10m"
+      - "vah above 10 minutes"
+      - "val below 10 minutes"
+
+      # timing EN con "first close" / "time"
+      - "first close above vah 10m"
+      - "first close below val 10m"
+      - "time above vah 10m"
+      - "time below val 10m"
+
+      # timing EN con "within"
+      - "first close above vah within 10m"
+      - "first close below val within 10m"
+      - "time above vah within 10m"
+      - "time below val within 10m"
+
+    forbidden_terms:
+      - "accettazione"
+      - "acceptance"
+
+    patterns_regex:
+      - "(?i)\\b(vah|val)\\b.*\\b(sopra|above|sotto|below)\\b.*\\b\\d{1,3}\\s*(m|min|minutes|minuti)\\b"
+      - "(?i)\\b(sopra|above|sotto|below)\\b.*\\b(vah|val)\\b.*\\b\\d{1,3}\\s*(m|min|minutes|minuti)\\b"
+
+
+
+  - id: rule_retest_probability
+    priority: 80
+    triggers_any: ["retest", "ritest", "ritesto"]
+    maps_to:
+      type: intent
+      intent_id: retest_probability_by_session_minutes
+    required_slots: ["session", "minutes"]
+
+  - id: cal_rule_success_by_weekday_overview
+    priority: 80
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: success_by_weekday
+      params:
+        weekday: "ALL"
+    patterns:
+      - "successo per weekday"
+      - "successo per giorno della settimana"
+      - "winrate per weekday"
+      - "winrate per giorno della settimana"
+      - "success by weekday"
+      - "winrate by weekday"
+      - "weekday success"
+      
+
+  - id: cal_rule_success_by_weekday_single
+    priority: 90
+    slots:
+      weekday_calendar: { required: true }
+    maps_to:
+      type: intent
+      intent_id: success_by_weekday
+      params_from_slots:
+        weekday: weekday_calendar
+    patterns:
+      - "successo {weekday_calendar}"
+      - "winrate {weekday_calendar}"
+      - "{weekday_calendar} success"
+      - "success {weekday_calendar}"
+    patterns_regex:
+      - "(?i)\\b(successo|winrate|success)\\b.*\\b(lun|lunedì|lunedi|monday|mon|mar|martedì|martedi|tuesday|tue|mer|mercoledì|mercoledi|wednesday|wed|gio|giovedì|giovedi|thursday|thu|ven|venerdì|venerdi|friday|fri|sab|sabato|saturday|sat|dom|domenica|sunday|sun)\\b"
+
+
+  - id: rule_success_by_weekday_session
+    priority: 79
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: success_by_weekday_session
+      params_from_slots: {}
+    patterns:
+      # ITA
+      - "successo per weekday e sessione"
+      - "successo per sessione"
+      - "successo sessione weekday"
+      # EN
+      - "success by weekday and session"
+      - "session success by weekday"
+      - "weekday session success"
+
+  - id: rule_weekday_volatility_breakout
+    priority: 80
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: weekday_volatility_and_breakout_success
+      params_from_slots:
+        weekday: "ALL"
+    patterns:
+      - "volatilita per weekday"
+      - "volatilità per weekday"
+      - "volatilita weekday"
+      - "volatilità weekday"
+      - "volatility by weekday"
+      - "weekday volatility"
+
+  - id: cal_rule_success_by_month_overview
+    priority: 80
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: success_by_month
+      params:
+        month: "ALL"
+    patterns:
+      - "successo per mese"
+      - "winrate per mese"
+      - "success by month"
+      - "winrate by month"
+
+  - id: cal_rule_success_by_month_single
+    priority: 95
+    slots:
+      month: { required: true }
+    maps_to:
+      type: intent
+      intent_id: success_by_month
+      params_from_slots:
+        month: month
+    patterns:
+      - "successo a {month}"
+      - "winrate a {month}"
+      - "success in {month}"
+      - "winrate in {month}"
+    patterns_regex:
+      - "(?i)\\b(successo|winrate|success)\\b.*\\b(a|in)\\b.*\\b(gen|gennaio|jan|january|feb|febbraio|february|mar|marzo|march|apr|aprile|april|mag|maggio|may|giu|giugno|jun|june|lug|luglio|jul|july|ago|agosto|aug|august|set|sett|settembre|sep|september|ott|ottobre|oct|october|nov|novembre|november|dic|dicembre|dec|december)\\b"
+
+  
+  - id: cal_rule_success_by_day_of_month_overview
+    priority: 98
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: success_by_day_of_month
+      params:
+        day_of_month: "ALL"
+    patterns:
+      - "successo per giorno del mese"
+      - "successo per giorno mese"
+      - "winrate per giorno del mese"
+      - "success by day of month"
+      - "success by day-of-month"
+
+  - id: cal_rule_success_by_day_of_month_single
+    priority: 97
+    slots:
+      day_of_month: { required: true }
+
+    maps_to:
+      type: intent
+      intent_id: success_by_day_of_month
+      params_from_slots:
+        day_of_month: day_of_month
+
+    patterns:
+      - "successo il {day_of_month}"
+      - "successo giorno {day_of_month}"
+      - "winrate il {day_of_month}"
+      - "success on day {day_of_month}"
+      - "success day {day_of_month}"
+
+
+    patterns_regex:
+      - '(?i)\b(success|successo|winrate)\b.*\b(day|giorno)\b.*(?P<day_of_month>\d{1,2})\b'
+      - '(?i)\b(success|successo|winrate)\b.*\bil\b\s*(?P<day_of_month>\d{1,2})\b'
+
+
+  - id: cal_rule_success_by_week_of_month_overview
+    priority: 80
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: success_by_week_of_month
+      params:
+        week_of_month: "ALL"
+    patterns:
+      - "successo per settimana del mese"
+      - "winrate per settimana del mese"
+      - "success by week of month"
+      - "winrate by week of month"
+
+  - id: cal_rule_success_by_week_of_month_single
+    priority: 90
+    slots:
+      week_of_month: { required: true }
+    maps_to:
+      type: intent
+      intent_id: success_by_week_of_month
+      params_from_slots:
+        week_of_month: week_of_month
+    patterns:
+      - "successo nella {week_of_month} settimana"
+      - "winrate nella {week_of_month} settimana"
+      - "success in week {week_of_month} of month"
+      - "winrate in week {week_of_month} of month"
+
+
+  - id: cal_rule_success_by_hour_overview
+    priority: 99
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: success_by_hour
+      params_from_slots: {}
+      params:
+        hour: "ALL"
+    patterns:
+      - "successo per ora"
+      - "successo per ore"
+      - "winrate per ora"
+      - "winrate per ore"
+      - "success by hour"
+      - "success per hour"
+      - "winrate by hour"
+    patterns_regex:
+      - '(?i)\b(success|successo|winrate)\b.*\b(per|by)\b.*\b(ora|ore|hour|hours)\b'
+
+
+
+  - id: cal_rule_success_by_hour_single
+    priority: 90
+    slots:
+      hour: { required: true }
+    maps_to:
+      type: intent
+      intent_id: success_by_hour
+      params_from_slots:
+        hour: hour
+    patterns:
+      - "successo alle {hour}"
+      - "winrate alle {hour}"
+      - "successo ore {hour}"
+      - "winrate ore {hour}"
+      - "success at {hour}"
+      - "winrate at {hour}"
+  
+  - id: cal_rule_success_by_day_of_month_and_hour
+    priority: 110
+    slots:
+      day_of_month: { required: true }
+      hour: { required: true }
+    maps_to:
+      type: intent
+      intent_id: success_by_day_of_month
+      params_from_slots:
+        day_of_month: day_of_month
+        hour: hour
+    patterns_regex:
+      - "(?i)\\bsuccesso\\b.*\\bil\\s+(\\d{1,2})\\b.*\\b(alle|ore|at)\\s+(\\d{1,2})\\b"
+
+  - id: cal_rule_success_by_day_of_month_and_hour
+    priority: 99
+    slots:
+      day_of_month: { required: true }
+      hour: { required: true }
+    maps_to:
+      type: intent
+      intent_id: success_by_day_of_month_and_hour
+      params_from_slots:
+        day_of_month: day_of_month
+        hour: hour
+    patterns:
+      - "successo il {day_of_month} alle {hour}"
+      - "successo {day_of_month} alle {hour}"
+      - "winrate il {day_of_month} alle {hour}"
+      - "success {day_of_month} at {hour}"
+    patterns_regex:
+      - "(?i)\\b(successo|winrate|success)\\b.*\\b(il\\s*)?(?P<day_of_month>\\d{1,2})\\b.*\\b(alle|ore|at)\\b.*\\b(?P<hour>\\d{1,2})\\b"
+    
+
+  - id: cal_rule_volatility_by_day_of_month_overview
+    priority: 98
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: volatility_by_day_of_month
+      params:
+        day_of_month: "ALL"
+    patterns:
+      - "volatilità per giorno del mese"
+      - "volatilita per giorno del mese"
+      - "volatilità per giorno mese"
+      - "volatilita per giorno mese"
+      - "volatility by day of month"
+      - "volatility by day-of-month"
+
+  - id: cal_rule_volatility_by_day_of_month_single
+    priority: 90
+    slots:
+      day_of_month: { required: true }
+    maps_to:
+      type: intent
+      intent_id: volatility_by_day_of_month
+      params_from_slots: {}
+    patterns:
+      - "volatilita il {day_of_month}"
+      - "volatilità il {day_of_month}"
+      - "volatility on day {day_of_month}"
+
+  
+  - id: cal_rule_volatility_by_hour_overview
+    priority: 99
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: volatility_by_hour
+      params_from_slots: {}
+      params:
+        hour: "ALL"
+    patterns:
+      - "volatilità per ora"
+      - "volatilita per ora"
+      - "volatilità per ore"
+      - "volatilita per ore"
+      - "volatility by hour"
+      - "volatility per hour"
+    patterns_regex:
+      - '(?i)\b(volatility|volatilita|volatilità)\b.*\b(per|by)\b.*\b(ora|ore|hour|hours)\b'
+
+
+  - id: cal_rule_volatility_by_hour_single
+    priority: 97
+    slots:
+      hour: { required: true }
+
+    maps_to:
+      type: intent
+      intent_id: volatility_by_hour
+      params_from_slots:
+        hour: hour
+
+    patterns:
+      - "volatilità alle {hour}"
+      - "volatilita alle {hour}"
+      - "volatilità ore {hour}"
+      - "volatilita ore {hour}"
+      - "volatility at {hour}"
+      - "volatility hour {hour}"
+
+    patterns_regex:
+      - '(?i)\b(volatility|volatilita|volatilità)\b.*\b(hour|ora|ore|h)\b.*(?P<hour>\d{1,2})\b'
+      - '(?i)\b(volatility|volatilita|volatilità)\b.*\b(alle|at)\b\s*(?P<hour>\d{1,2})\b'
+
+  - id: cal_rule_volatility_by_month_overview
+    priority: 90
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: volatility_by_month
+      params_from_slots: {}
+    patterns:
+      - "volatilità per mese"
+      - "volatilita per mese"
+      - "volatilità per mesi"
+      - "volatilita per mesi"
+      - "volatility by month"
+      - "monthly volatility"
+
+
+  - id: rule_mp06_success_high_vol
+    priority: 86
+    triggers_any: ["high vol", "high volume", "volume alto", "regime alto volume", "mp06"]
+    maps_to:
+      type: intent
+      intent_id: mp06_success_accept5m_high_vol_report
+      params_from_slots:
+        session: session
+    required_slots: ["session"]
+
+  - id: rule_mp07_success_by_delta_sign
+    priority: 86
+    triggers_any: ["delta", "segno delta", "delta sign", "mp07"]
+    maps_to:
+      type: intent
+      intent_id: mp07_success_accept5m_by_delta_sign_report
+      params_from_slots:
+        session: session
+    required_slots: ["session"]
+
+  - id: rule_win01_success_by_vol_bucket
+    priority: 80
+
+    maps_to:
+      type: intent
+      intent_id: win01_success_by_w0900_1300_vol_bucket_report
+
+    patterns:
+      - "win01 success per bucket volatilità"
+      - "successo win01 per bucket volatilità"
+      - "successo win01 per bucket di vol"
+      - "win01 success per bucket di vol"
+      - "win01 success vol bucket"
+      - "success win01 vol bucket"
+
+    patterns_regex:
+      - "(?i)\\b(win01)\\b.*\\b(success|successo)\\b.*\\b(bucket)\\b.*\\b(vol|volatilita|volatility)\\b"
+  
+  - id: rule_lv02_p_success_given_prev_day_poc_accept5m_h60
+    priority: 88
+
+    maps_to:
+      type: intent
+      intent_id: p_success_given_prev_day_poc_accept5m_h60
+
+    patterns:
+      - "p(success | acceptance poc entro 5m) prev day"
+      - "p(success | acceptance poc within 5m) prev day"
+      - "p(success | poc acceptance 5m prev day)"
+      - "probabilità successo poc acceptance 5m prev day"
+      - "successo condizionato a acceptance poc 5m prev day"
+
+    patterns_regex:
+      - "(?i)\\bp\\s*\\(\\s*success\\s*\\|.*\\b(acceptance|accettazione)\\b.*\\bpoc\\b.*\\b(entro|within)\\b.*\\b5\\s*(m|min|minutes|minuti)\\b.*\\b(prev\\s*day|giorno\\s*prima|ieri)\\b"
+      - "(?i)\\b(probabilita|probabilità)\\b.*\\b(success|successo)\\b.*\\bpoc\\b.*\\b(acceptance|accettazione)\\b.*\\b5\\s*(m|min|minutes|minuti)\\b.*\\b(prev\\s*day|giorno\\s*prima|ieri)\\b"
+
+  # --- RANKING: SUCCESS (MONTH) ---
+
+  - id: cal_rule_success_by_month_best
+    priority: 120
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: success_by_month_best
+      params_from_slots: {}
+    patterns:
+      - "qual è il mese con più successo"
+      - "qual è il mese con il più successo"
+      - "mese con più successo"
+      - "miglior mese per successo"
+      - "mese migliore per successo"
+      - "miglior mese per winrate"
+      - "mese migliore per winrate"
+      - "which month has the highest success"
+      - "best month for success"
+      - "highest success month"
+    patterns_regex:
+      patterns_regex:
+        - "(?i)\\b(mese|month)\\b.*\\b(pi[uù]|highest|best|miglior|migliore)\\b.*\\b(successo|success|winrate)\\b"
+
+  - id: cal_rule_success_by_month_worst
+    priority: 120
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: success_by_month_worst
+      params_from_slots: {}
+    patterns:
+      - "qual è il mese con meno successo"
+      - "mese con meno successo"
+      - "peggior mese per successo"
+      - "mese peggiore per successo"
+      - "peggior mese per winrate"
+      - "mese peggiore per winrate"
+      - "which month has the lowest success"
+      - "worst month for success"
+      - "lowest success month"
+    patterns_regex:
+      patterns_regex:
+        - "(?i)\\b(mese|month)\\b.*\\b(meno|lowest|worst|peggior|peggiore)\\b.*\\b(successo|success|winrate)\\b"
+
+
+  # --- RANKING: VOLATILITY (HOUR) ---
+
+  - id: cal_rule_volatility_by_hour_best
+    priority: 120
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: volatility_by_hour_best
+      params_from_slots: {}
+    patterns:
+      - "qual è l'ora più volatile"
+      - "qual è l ora più volatile"
+      - "qual è lora più volatile"
+      - "ora più volatile"
+      - "orario più volatile"
+      - "ora con più volatilità"
+      - "which hour is the most volatile"
+      - "most volatile hour"
+      - "highest volatility hour"
+    patterns_regex:
+      patterns_regex:
+        - "(?i)\\b(ora|hour|orario)\\b.*\\b(pi[uù]|most|highest)\\b.*\\b(volatilita|volatilità|volatility)\\b"
+
+  - id: cal_rule_volatility_by_hour_worst
+    priority: 120
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: volatility_by_hour_worst
+      params_from_slots: {}
+    patterns:
+      - "qual è l'ora meno volatile"
+      - "qual è l ora meno volatile"
+      - "qual è lora meno volatile"
+      - "ora meno volatile"
+      - "orario meno volatile"
+      - "ora con meno volatilità"
+      - "which hour is the least volatile"
+      - "least volatile hour"
+      - "lowest volatility hour"
+    patterns_regex:
+      patterns_regex:
+        - "(?i)\\b(ora|hour|orario)\\b.*\\b(meno|least|lowest)\\b.*\\b(volatilita|volatilità|volatility)\\b"
+
+
+  # --- RANKING: VOLATILITY (DAY OF MONTH) ---
+
+  - id: cal_rule_volatility_by_day_of_month_best
+    priority: 120
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: volatility_by_day_of_month_best
+      params_from_slots: {}
+    patterns:
+      - "qual è il giorno del mese più volatile"
+      - "giorno del mese più volatile"
+      - "giorno del mese con più volatilità"
+      - "which day of month is the most volatile"
+      - "most volatile day of month"
+      - "highest volatility day of month"
+    patterns_regex:
+      patterns_regex:
+        - "(?i)\\b(giorno del mese|day of month)\\b.*\\b(pi[uù]|most|highest)\\b.*\\b(volatilita|volatilità|volatility)\\b"
+
+  - id: cal_rule_volatility_by_day_of_month_worst
+    priority: 120
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: volatility_by_day_of_month_worst
+      params_from_slots: {}
+    patterns:
+      - "qual è il giorno del mese meno volatile"
+      - "giorno del mese meno volatile"
+      - "giorno del mese con meno volatilità"
+      - "which day of month is the least volatile"
+      - "least volatile day of month"
+      - "lowest volatility day of month"
+    patterns_regex:
+      patterns_regex:
+        - "(?i)\\b(giorno del mese|day of month)\\b.*\\b(meno|least|lowest)\\b.*\\b(volatilita|volatilità|volatility)\\b"
+
+  - id: cal_rule_weekday_volatility_breakout_overview_it
+    priority: 85
+    slots: {}
+    maps_to:
+      type: intent
+      intent_id: weekday_volatility_and_breakout_success
+      params_from_slots:
+        weekday: "ALL"
+    patterns:
+      - "volatilità per giorno della settimana"
+      - "volatilita per giorno della settimana"
+      - "volatilità per weekday"
+      - "volatilita per weekday"
+      - "volatilità weekday"
+      - "volatilita weekday"
+
+  - id: cal_rule_weekday_volatility_breakout_single
+    priority: 95
+    slots:
+      weekday_calendar: { required: true }
+    maps_to:
+      type: intent
+      intent_id: weekday_volatility_and_breakout_success
+      params_from_slots:
+        weekday: weekday_calendar
+    patterns:
+      # IT
+      - "volatilità {weekday_calendar}"
+      - "volatilita {weekday_calendar}"
+      - "{weekday_calendar} volatilità"
+      - "{weekday_calendar} volatilita"
+
+      # EN
+      - "volatility {weekday_calendar}"
+      - "{weekday_calendar} volatility"
+
+    patterns_regex:
+      - "(?i)\\b(volatilita|volatilità|volatility)\\b.*\\b(lun|lunedì|lunedi|monday|mon|mar|martedì|martedi|tuesday|tue|mer|mercoledì|mercoledi|wednesday|wed|gio|giovedì|giovedi|thursday|thu|ven|venerdì|venerdi|friday|fri|sab|sabato|saturday|sat|dom|domenica|sunday|sun)\\b"
+
+  - id: cal_rule_compare_volatility_by_weekday
+    priority: 50
+    patterns_regex:
+      - >-
+        (?i)\b(confronta|compare)\b.*\b(volatilit[aà]|volatility|atr)\b.*\b
+        (?P<a>lun(?:ed[iì])?|mon(?:day)?|mar(?:ted[iì])?|tue(?:sday)?|mer(?:coled[iì])?|wed(?:nesday)?|gio(?:ved[iì])?|thu(?:rsday)?|ven(?:erd[iì])?|fri(?:day)?|sab(?:ato)?|sat(?:urday)?|dom(?:enica)?|sun(?:day)?)\b.*\b
+        (e|and|vs|versus)\b.*\b
+        (?P<b>lun(?:ed[iì])?|mon(?:day)?|mar(?:ted[iì])?|tue(?:sday)?|mer(?:coled[iì])?|wed(?:nesday)?|gio(?:ved[iì])?|thu(?:rsday)?|ven(?:erd[iì])?|fri(?:day)?|sab(?:ato)?|sat(?:urday)?|dom(?:enica)?|sun(?:day)?)\b
+    intent_id: compare_volatility_by_weekday
+    params:
+      title: "Confronto volatilità per weekday"
+
+
+  - id: cal_rule_compare_success_by_weekday
+    priority: 200
+    maps_to:
+      type: intent
+      intent_id: compare_success_by_weekday
+      params_from_regex:
+        a: a
+        b: b
+      params:
+        title: "Confronto successo per weekday"
+    patterns_regex:
+      - "(?i)\\b(confronta|compare)\\b.*\\b(successo|success|winrate)\\b.*\\b(?P<a>lun(?:ed[iì])?|mon(?:day)?|mar(?:ted[iì])?|tue(?:sday)?|mer(?:coled[iì])?|wed(?:nesday)?|gio(?:ved[iì])?|thu(?:rsday)?|ven(?:erd[iì])?|fri(?:day)?|sab(?:ato)?|sat(?:urday)?|dom(?:enica)?|sun(?:day)?)\\b.*\\b(e|and|vs|versus)\\b.*\\b(?P<b>lun(?:ed[iì])?|mon(?:day)?|mar(?:ted[iì])?|tue(?:sday)?|mer(?:coled[iì])?|wed(?:nesday)?|gio(?:ved[iì])?|thu(?:rsday)?|ven(?:erd[iì])?|fri(?:day)?|sab(?:ato)?|sat(?:urday)?|dom(?:enica)?|sun(?:day)?)\\b"
+
+  - id: cal_rule_compare_volatility_by_hour
+    priority: 50
+    patterns_regex:
+      - (?i)\b(compare|confronta)\b.*\b(volatility|volatilita)\b.*\b(hour|ora|ore|alle|h)\b.*(?P<a>\d{1,2})\s*(?:vs\.?|and|e)\s*(?P<b>\d{1,2})
+    intent_id: compare_volatility_by_hour
+    params:
+      title: "Confronto volatilità per ora"
+
+
+  - id: cal_rule_compare_volatility_by_day_of_month
+    priority: 50
+    patterns_regex:
+      - (?i)\b(compare|confronta)\b.*\b(volatility|volatilita)\b.*\b(day|giorno)\b.*(?P<a>\d{1,2})\s*(vs|e)\s*(?P<b>\d{1,2})
+    intent_id: compare_volatility_by_day_of_month
+    params:
+      title: "Confronto volatilità per giorno del mese"
+
+  - id: cal_rule_compare_success_by_month
+    priority: 50
+    patterns_regex:
+      - >-
+        (?i)\b(confronta|compare)\b.*\b(successo|success|winrate)\b.*\b
+        (?P<a>gen(?:naio)?|jan(?:uary)?|feb(?:braio)?|feb(?:ruary)?|mar(?:zo)?|mar(?:ch)?|apr(?:ile)?|apr(?:il)?|mag(?:gio)?|may|giu(?:gno)?|jun(?:e)?|lug(?:lio)?|jul(?:y)?|ago(?:sto)?|aug(?:ust)?|set(?:tembre)?|sep(?:tember)?|ott(?:obre)?|oct(?:ober)?|nov(?:embre)?|nov(?:ember)?|dic(?:embre)?|dec(?:ember)?)\b.*\b
+        (e|and|vs|versus)\b.*\b
+        (?P<b>gen(?:naio)?|jan(?:uary)?|feb(?:braio)?|feb(?:ruary)?|mar(?:zo)?|mar(?:ch)?|apr(?:ile)?|apr(?:il)?|mag(?:gio)?|may|giu(?:gno)?|jun(?:e)?|lug(?:lio)?|jul(?:y)?|ago(?:sto)?|aug(?:ust)?|set(?:tembre)?|sep(?:tember)?|ott(?:obre)?|oct(?:ober)?|nov(?:embre)?|nov(?:ember)?|dic(?:embre)?|dec(?:ember)?)\b
+    intent_id: compare_success_by_month
+    params:
+      title: "Confronto successo per mese"
+
+
+  - id: cal_rule_compare_volatility_by_month
+    priority: 50
+    patterns_regex:
+      - >-
+        (?i)\b(confronta|compare)\b.*\b(volatilit[aà]|volatility|atr)\b.*\b
+        (?P<a>gen(?:naio)?|jan(?:uary)?|feb(?:braio)?|feb(?:ruary)?|mar(?:zo)?|mar(?:ch)?|apr(?:ile)?|apr(?:il)?|mag(?:gio)?|may|giu(?:gno)?|jun(?:e)?|lug(?:lio)?|jul(?:y)?|ago(?:sto)?|aug(?:ust)?|set(?:tembre)?|sep(?:tember)?|ott(?:obre)?|oct(?:ober)?|nov(?:embre)?|nov(?:ember)?|dic(?:embre)?|dec(?:ember)?)\b.*\b
+        (e|and|vs|versus)\b.*\b
+        (?P<b>gen(?:naio)?|jan(?:uary)?|feb(?:braio)?|feb(?:ruary)?|mar(?:zo)?|mar(?:ch)?|apr(?:ile)?|apr(?:il)?|mag(?:gio)?|may|giu(?:gno)?|jun(?:e)?|lug(?:lio)?|jul(?:y)?|ago(?:sto)?|aug(?:ust)?|set(?:tembre)?|sep(?:tember)?|ott(?:obre)?|oct(?:ober)?|nov(?:embre)?|nov(?:ember)?|dic(?:embre)?|dec(?:ember)?)\b
+    intent_id: compare_volatility_by_month
+    params:
+      title: "Confronto volatilità per mese"
+
+  - id: cal_rule_compare_success_by_hour
+    priority: 50
+    patterns_regex:
+      - >-
+        (?i)\b(confronta|compare)\b.*\b(successo|success|winrate)\b.*\b
+        (?P<a>(?:[01]?\d|2[0-3])(?:[:\.]00)?)\b.*\b
+        (e|and|vs|versus)\b.*\b
+        (?P<b>(?:[01]?\d|2[0-3])(?:[:\.]00)?)\b
+    intent_id: compare_success_by_hour
+    params:
+      title: "Confronto successo per ora"
+  
+  - id: cal_rule_compare_success_by_day_of_month
+    priority: 60
+    patterns_regex:
+      - '(?i)\b(compare|confronta)\b.*\b(success|winrate|successo)\b.*\b(day|giorno)\b.*(?P<a>\d{1,2})\s*(vs|e)\s*(?P<b>\d{1,2})'
+    intent_id: compare_success_by_day_of_month
+    params:
+      title: "Confronto successo per giorno del mese"
+  
+  - id: cal_rule_compare_success_by_week_of_month
+    priority: 60
+    patterns_regex:
+      - '(?i)\b(compare|confronta)\b.*\b(success|winrate|successo)\b.*\b(week|settimana)\b.*(?P<a>\d)\s*(vs|e)\s*(?P<b>\d)'
+    intent_id: compare_success_by_week_of_month
+    params:
+      title: "Confronto successo per settimana del mese"
+
+
+

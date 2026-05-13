@@ -1,0 +1,80 @@
+{
+  "meta": {
+    "source_metric": "distribution",
+    "derived_metric": null,
+    "group_by": ["session_calc"],
+    "filters": []
+  },
+  "summary": {
+    "rows_total": 89,
+    "rows_valid": 89
+  },
+  "insights": [
+    {
+      "type": "range_gap",
+      "dimension": null,
+      "value": null,
+      "metric_value": 30,
+      "support": { "rows_valid": 89 },
+      "classification": "A",
+      "flags": []
+    },
+    {
+      "type": "dominant_segment",
+      "dimension": "session_calc|breakout_outcome",
+      "value": {
+        "session_calc": "asia",
+        "breakout_outcome": "false_breakout"
+      },
+      "metric_value": 0.7948717948717948,
+      "support": { "rows_valid": 39 },
+      "classification": "A",
+      "flags": []
+    },
+    {
+      "type": "dominant_segment",
+      "dimension": "session_calc|breakout_outcome",
+      "value": {
+        "session_calc": "ny",
+        "breakout_outcome": "false_breakout"
+      },
+      "metric_value": 0.84,
+      "support": { "rows_valid": 25 },
+      "classification": "A",
+      "flags": []
+    },
+    {
+      "type": "top_gap",
+      "dimension": null,
+      "value": null,
+      "metric_value": 10,
+      "support": { "rows_valid": 25 },
+      "classification": "A",
+      "flags": []
+    },
+    {
+      "type": "distribution",
+      "dimension": "session_calc|breakout_outcome",
+      "value": {
+        "session_calc": "asia",
+        "breakout_outcome": "failed_follow_through"
+      },
+      "metric_value": 4,
+      "support": { "rows_valid": 39 },
+      "classification": "B",
+      "flags": []
+    },
+    {
+      "type": "distribution",
+      "dimension": "session_calc|breakout_outcome",
+      "value": {
+        "session_calc": "asia",
+        "breakout_outcome": "true_breakout"
+      },
+      "metric_value": 4,
+      "support": { "rows_valid": 39 },
+      "classification": "B",
+      "flags": []
+    }
+  ]
+}

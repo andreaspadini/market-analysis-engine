@@ -1,0 +1,2 @@
+pattern_id,instrument,timeframe,mode,length_bars,n_occurrences,max_similarity_score
+manual_f82acdf29d4daada,MNQ,1m,manual_template,2,1998,0.5652173913043479

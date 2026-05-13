@@ -1,0 +1,2452 @@
+import { ReactNode, useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
+import { parquetReadObjects } from "hyparquet";
+import { useApi } from "../../api/ApiProvider";
+import { StatisticalKpiGrid } from "../../features/runresults/sections/statistical/StatisticalKpiGrid";
+import { StatisticalBarChart } from "../../features/runresults/sections/statistical/StatisticalBarChart";
+import { StatisticalStackedBarChart } from "../../features/runresults/sections/statistical/StatisticalStackedBarChart";
+
+type ManifestOutput = {
+  relpath?: string;
+  bytes?: number;
+  checksum?: {
+    alg?: string;
+    value?: string;
+  };
+};
+
+type ManifestResponse = {
+  manifest?: {
+    outputs?: ManifestOutput[];
+    producer?: {
+      tool_id?: string;
+      tool_version?: string;
+    };
+  };
+};
+
+type Row = Record<string, unknown>;
+
+type ExpandedChartState = {
+  title: string;
+  content: ReactNode;
+} | null;
+
+function isScalarValue(value: unknown): boolean {
+  return (
+    value == null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
+}
+
+function formatCellValue(value: unknown, column?: string): React.ReactNode {
+  if (value == null) return "";
+
+  // =========================
+  // SESSION (COMPATTA)
+  // =========================
+  if (column === "session_calc") {
+    const map: Record<string, string> = {
+      ny: "NY",
+      asia: "AS",
+      europe: "EU",
+      off: "OFF",
+    };
+
+    const label = map[String(value)] ?? String(value);
+
+    return (
+      <span
+        style={{
+          border: "1px solid rgba(255,255,255,0.15)",
+          borderRadius: 999,
+          padding: "2px 6px",
+          fontSize: 11,
+          opacity: 0.9,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </span>
+    );
+  }
+
+  if (column === "breakout_price" && typeof value === "number") {
+    return value.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+
+  if (column === "breakout_time" && typeof value === "string") {
+    const [date, time] = value.split("T");
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
+        <span style={{ fontSize: 12, opacity: 0.85 }}>{date}</span>
+        <span style={{ fontSize: 11, opacity: 0.6 }}>
+          {time?.slice(0, 5)}
+        </span>
+      </div>
+    );
+  }
+
+  if (column === "delta_bucket") {
+    const map: Record<string, string> = {
+      delta_0_100: "Δ 0–100",
+      delta_100_300: "Δ 100–300",
+      delta_300_600: "Δ 300–600",
+      delta_600_1000: "Δ 600–1000",
+      delta_1000_plus: "Δ 1000+",
+    };
+
+    return map[String(value)] ?? String(value);
+  }
+
+  // =========================
+  // EXCURSION / RETRACEMENT (UNIT)
+  // =========================
+  if (
+    (column === "max_excursion" || column === "retracement_depth") &&
+    typeof value === "number"
+  ) {
+    return `${value.toFixed(2)} pts`;
+  }
+
+  // =========================
+  // WEEKDAY (SHORT)
+  // =========================
+  if (column === "weekday") {
+    const map: Record<string, string> = {
+      monday: "Mon",
+      tuesday: "Tue",
+      wednesday: "Wed",
+      thursday: "Thu",
+      friday: "Fri",
+      saturday: "Sat",
+      sunday: "Sun",
+    };
+
+    return map[String(value)] ?? String(value);
+  }
+
+  // =========================
+  // SIDE (BADGE)
+  // =========================
+  if (column === "side") {
+    const color =
+      value === "long"
+        ? "rgba(34,197,94,0.15)"
+        : value === "short"
+        ? "rgba(239,68,68,0.15)"
+        : "rgba(255,255,255,0.08)";
+
+    return (
+      <span
+        style={{
+          padding: "2px 6px",
+          borderRadius: 999,
+          fontSize: 11,
+          background: color,
+          border: "1px solid rgba(255,255,255,0.12)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {String(value).toUpperCase()}
+      </span>
+    );
+  }
+
+  // =========================
+  // OUTCOME (COLOR)
+  // =========================
+  if (column === "breakout_outcome") {
+    const color =
+      value === "true_breakout"
+        ? "#22c55e"
+        : value === "false_breakout"
+        ? "#ef4444"
+        : "#f59e0b";
+
+    return (
+      <span style={{ color, fontWeight: 500 }}>
+        {String(value)}
+      </span>
+    );
+  }
+
+  // =========================
+  // DEFAULT BEHAVIOR
+  // =========================
+  if (typeof value === "string") {
+    return value.length > 120 ? `${value.slice(0, 117)}...` : value;
+  }
+
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? value : value.toFixed(2);
+  }
+
+  if (typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return `[list:${value.length}]`;
+  }
+
+  if (typeof value === "object") {
+    return "[object]";
+  }
+
+  return String(value);
+}
+
+function pickPreviewColumns(rows: Row[]): string[] {
+  const firstRow = rows[0];
+  if (!firstRow) return [];
+
+  const allColumns = Object.keys(firstRow);
+
+  const priorityColumns = [
+    "breakout_id",
+    "breakout_time",
+    "direction",
+    "breakout_price",
+    "breakout_outcome",
+    "instrument",
+    "side",
+    "atr_before",
+    "initial_delta",
+    "delta_bucket",
+    "initial_volume",
+    "max_excursion",
+    "retracement_depth",
+    "session_calc",
+    "weekday",
+    "hour",
+  ];
+
+  const availablePriority = priorityColumns.filter((col) =>
+    allColumns.includes(col)
+  );
+
+  const scalarFallback = allColumns.filter((col) =>
+    rows.some((row) => isScalarValue(row[col]))
+  );
+
+  const merged = [...availablePriority];
+  for (const col of scalarFallback) {
+    if (!merged.includes(col)) {
+      merged.push(col);
+    }
+  }
+
+  return merged.slice(0, 15);
+}
+
+function groupBy(rows: any[], key: string) {
+  const map: Record<string, any[]> = {};
+  for (const row of rows) {
+    const value = String(row[key] ?? "unknown");
+    if (!map[value]) map[value] = [];
+    map[value].push(row);
+  }
+  return map;
+}
+
+function formatDeltaBucketLabel(key: string) {
+  if (key.includes("delta_")) {
+    const parts = key.replace("delta_", "").split("_");
+
+    if (parts.length === 2) {
+      return `Δ ${parts[0]}–${parts[1]}`;
+    }
+
+    if (parts.length === 3 && parts[2] === "plus") {
+      return `Δ ${parts[0]}+`;
+    }
+  }
+
+  return key;
+}
+
+function formatVolumeBucketLabel(key: string) {
+  return `Volume ${key}`;
+}
+
+function getDeltaSign(value: any) {
+  const v = Number(value);
+  if (isNaN(v)) return "unknown";
+  if (v > 0) return "positive";
+  if (v < 0) return "negative";
+  return "neutral";
+}
+
+function distribution(rows: any[], key: string) {
+  const groups = groupBy(rows, key);
+  const total = rows.length;
+
+  return Object.entries(groups)
+    .map(([k, v]) => ({
+      key: k,
+      count: v.length,
+      pct: total > 0 ? (v.length / total) * 100 : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
+}
+
+function avg(rows: any[], field: string) {
+  const values = rows
+    .map((r) => Number(r[field]))
+    .filter((v) => !isNaN(v));
+
+  if (!values.length) return null;
+
+  return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
+function numericSummary(rows: any[], field: string) {
+  const values = rows
+    .map((r) => Number(r[field]))
+    .filter((v) => !isNaN(v));
+
+  if (!values.length) return null;
+
+  return {
+    avg: avg(rows, field),
+    min: Math.min(...values),
+    max: Math.max(...values),
+  };
+}
+
+function detectTargetColumns(columns: string[]): string[] {
+  return columns.filter((col) => {
+    if (col === "is_clean_quant") return true;
+    if (col.includes("_ATR")) return true;
+    if (col.includes("_ticks")) return true;
+
+    const lower = col.toLowerCase();
+    if (lower.startsWith("t1")) return true;
+    if (lower.startsWith("t2")) return true;
+
+    return false;
+  });
+}
+
+function cleanQuantRate(rows: any[]): number | null {
+  const valid = rows
+    .map((r) => r.is_clean_quant)
+    .filter((v) => v !== null && v !== undefined);
+
+  if (!valid.length) return null;
+
+  const clean = valid.filter(
+    (v) => v === true || v === "true" || v === 1
+  ).length;
+
+  return (clean / valid.length) * 100;
+}
+
+function isTruthyLabel(value: unknown): boolean {
+  return value === true || value === "true" || value === 1;
+}
+
+function targetSuccessRate(rows: any[], column: string): number {
+  if (!rows.length) return 0;
+
+  const success = rows.filter((row) => isTruthyLabel(row[column])).length;
+  return (success / rows.length) * 100;
+}
+
+function parseAtrScanLevel(column: string): number | null {
+  const match = column.match(/_([0-9]+(?:_[0-9]+)?)ATR$/);
+  if (!match) return null;
+  return Number(match[1].replace("_", "."));
+}
+
+function parseTickScanLevel(column: string): number | null {
+  const match = column.match(/_(\d+)ticks$/);
+  if (!match) return null;
+  return Number(match[1]);
+}
+
+function classifyTargetColumns(columns: string[]) {
+  const atrScanColumns = columns
+    .filter((column) => parseAtrScanLevel(column) !== null)
+    .sort((a, b) => (parseAtrScanLevel(a) ?? 0) - (parseAtrScanLevel(b) ?? 0));
+
+  const cleanTickColumns = columns
+    .filter((column) => column.includes("_clean_") && parseTickScanLevel(column) !== null)
+    .sort((a, b) => (parseTickScanLevel(a) ?? 0) - (parseTickScanLevel(b) ?? 0));
+
+  const tickScanColumns = columns
+    .filter(
+      (column) =>
+        !column.includes("_clean_") &&
+        parseTickScanLevel(column) !== null
+    )
+    .sort((a, b) => (parseTickScanLevel(a) ?? 0) - (parseTickScanLevel(b) ?? 0));
+
+  const cleanQuantColumns: string[] = columns.filter(
+    (column) =>
+      column === "is_clean_quant" ||
+      column === "clean_quant_label"
+  );
+
+  const directTargetColumns = columns.filter(
+    (column) =>
+      !atrScanColumns.includes(column) &&
+      !tickScanColumns.includes(column) &&
+      !cleanTickColumns.includes(column) &&
+      !cleanQuantColumns.includes(column)
+  );
+
+  return {
+    directTargetColumns,
+    atrScanColumns,
+    tickScanColumns,
+    cleanTickColumns,
+    cleanQuantColumns,
+  };
+}
+
+function buildTargetRateData(rows: any[], columns: string[]) {
+  return columns.map((column) => ({
+    name: column,
+    value: Number(targetSuccessRate(rows, column).toFixed(1)),
+  }));
+}
+
+function avgByGroup(rows: any[], groupKey: string, field: string) {
+  const groups = groupBy(rows, groupKey);
+
+  return Object.entries(groups).map(([k, v]) => ({
+    key: k,
+    avg: avg(v, field),
+    count: v.length,
+  }));
+}
+
+function groupByTwo(rows: any[], key1: string, key2: string) {
+  const totalByGroup: Record<string, Record<string, number>> = {};
+
+  rows.forEach((r) => {
+    const k1 = String(r[key1] ?? "unknown");
+    const k2 = String(r[key2] ?? "unknown");
+
+    if (!totalByGroup[k1]) {
+      totalByGroup[k1] = {};
+    }
+
+    totalByGroup[k1][k2] = (totalByGroup[k1][k2] ?? 0) + 1;
+  });
+
+  return Object.entries(totalByGroup).map(([k1, inner]) => {
+    const total = Object.values(inner).reduce((a, b) => a + b, 0);
+
+    return {
+      key: k1,
+      values: Object.entries(inner).map(([k2, count]) => ({
+        key: k2,
+        count,
+        pct: total > 0 ? (count / total) * 100 : 0,
+      })),
+    };
+  });
+}
+
+function groupByTwoKeys(rows: any[], key1: string, key2: string) {
+  const map: Record<string, Record<string, any[]>> = {};
+
+  rows.forEach((r) => {
+    const k1 = String(r[key1] ?? "unknown");
+    const k2 = String(r[key2] ?? "unknown");
+
+    if (!map[k1]) map[k1] = {};
+    if (!map[k1][k2]) map[k1][k2] = [];
+
+    map[k1][k2].push(r);
+  });
+
+  return map;
+}
+
+function renderOutcomeValue(v: any) {
+  const isBest = v.key === "true_breakout";
+  const isWorst = v.key === "false_breakout";
+
+  return (
+    <div
+      key={v.key}
+      style={{
+        paddingLeft: 8,
+        color: isBest ? "#22c55e" : isWorst ? "#ef4444" : "#e5e7eb",
+        fontWeight: isBest ? 600 : 400,
+      }}
+    >
+      {v.key}: {v.count} ({v.pct.toFixed(1)}%)
+    </div>
+  );
+}
+
+function sortDeltaBuckets(a: string, b: string) {
+  const order = [
+    "delta_0_100",
+    "delta_100_300",
+    "delta_300_600",
+    "delta_600_1000",
+    "delta_1000_plus",
+  ];
+
+  return order.indexOf(a) - order.indexOf(b);
+}
+
+function sortVolumeBuckets(a: string, b: string) {
+  const order = ["medium", "high", "extreme"];
+  return order.indexOf(a) - order.indexOf(b);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+
+
+type BucketizersUsedResponse = {
+  bucketizers?: Record<string, Record<string, number>>;
+};
+
+function renderBucketizerValue(value: unknown): string {
+  if (typeof value === "number") {
+    return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  }
+  return String(value ?? "-");
+}
+
+function formatBucketizerLabel(key: string): string {
+  const map: Record<string, string> = {
+    volume_bucket: "Volume bucket",
+    delta_bucket: "Delta bucket",
+    atr_bucket: "ATR bucket",
+    compression_bucket: "Compression bucket",
+    pre_bo_bucket: "Pre-breakout bucket",
+    time_bucket: "Time bucket",
+
+    very_low_max: "Very low max",
+    low_max: "Low max",
+    medium_max: "Medium max",
+    high_max: "High max",
+
+    delta_0_100_max: "Δ 0–100 max",
+    delta_100_300_max: "Δ 100–300 max",
+    delta_300_600_max: "Δ 300–600 max",
+    delta_600_1000_max: "Δ 600–1000 max",
+
+    atr_0_0_5_max: "ATR 0.0–0.5 max",
+    atr_0_5_1_0_max: "ATR 0.5–1.0 max",
+    atr_1_0_1_5_max: "ATR 1.0–1.5 max",
+    atr_1_5_2_5_max: "ATR 1.5–2.5 max",
+
+    ultra_compressed_max: "Ultra compressed max",
+    compressed_max: "Compressed max",
+    balanced_max: "Balanced max",
+    expanded_max: "Expanded max",
+
+    pre_neg_max: "Pre negative max",
+    pre_0_2_max: "Pre 0–2 max",
+    pre_2_4_max: "Pre 2–4 max",
+    pre_4_6_max: "Pre 4–6 max",
+
+    tb_00_04_max: "Time 00–04 max",
+    tb_04_08_max: "Time 04–08 max",
+    tb_08_12_max: "Time 08–12 max",
+    tb_12_16_max: "Time 12–16 max",
+    tb_16_20_max: "Time 16–20 max",
+    tb_20_24_max: "Time 20–24 max",
+  };
+
+  return map[key] ?? key.replaceAll("_", " ");
+}
+
+function sortBucketizerSections(a: string, b: string): number {
+  const order = [
+    "volume_bucket",
+    "delta_bucket",
+    "atr_bucket",
+    "compression_bucket",
+    "pre_bo_bucket",
+    "time_bucket",
+  ];
+
+  return order.indexOf(a) - order.indexOf(b);
+}
+
+export function StatisticalResultsPage() {
+  const { toolId, fingerprint } = useParams();
+  const { http } = useApi();
+
+  const [rows, setRows] = useState<Row[]>([]);
+  const [relpath, setRelpath] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [bucketizersUsed, setBucketizersUsed] = useState<
+    Record<string, Record<string, number>> | null
+  >(null);
+  const [expandedChart, setExpandedChart] = useState<ExpandedChartState>(null);
+
+  const previewColumns = useMemo(() => pickPreviewColumns(rows), [rows]);
+  const allColumns = useMemo(
+    () => (rows[0] ? Object.keys(rows[0]) : []),
+    [rows]
+  );
+  console.log("STATISTICAL RESULT COLUMNS", allColumns);
+
+  const total = rows.length;
+
+  const targetColumns = detectTargetColumns(allColumns);
+
+  const {
+    directTargetColumns,
+    atrScanColumns,
+    tickScanColumns,
+    cleanTickColumns,
+    cleanQuantColumns,
+  } = classifyTargetColumns(targetColumns);
+
+  const directTargetRateData = buildTargetRateData(rows, directTargetColumns);
+  const atrScanRateData = buildTargetRateData(rows, atrScanColumns);
+  const tickScanRateData = buildTargetRateData(rows, tickScanColumns);
+  const cleanTickRateData = buildTargetRateData(rows, cleanTickColumns);
+
+  const cleanQuantSummary =
+    cleanQuantColumns.length > 0
+      ? Number(targetSuccessRate(rows, cleanQuantColumns[0]).toFixed(1))
+      : null;
+
+  const maxExcursionSummary = numericSummary(rows, "max_excursion");
+  const breakoutEfficiencySummary = numericSummary(rows, "breakout_efficiency");
+
+  const avgMaxExcursion = maxExcursionSummary?.avg ?? null;
+  const avgBreakoutEfficiency = breakoutEfficiencySummary?.avg ?? null;
+  const cleanQuantPct = cleanQuantRate(rows);
+
+  useEffect(() => {
+    async function loadData() {
+      if (!toolId || !fingerprint) {
+        setError("Missing route parameters.");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError(null);
+        setBucketizersUsed(null);
+
+        const manifestResponse = await http.get<ManifestResponse>(
+          `/manifests/${toolId}/${fingerprint}`
+        );
+
+        const outputs = manifestResponse?.manifest?.outputs ?? [];
+
+        const parquetOutput =
+          outputs.find(
+            (output) => output?.relpath === "outputs/statistical_dataset.parquet"
+          ) ??
+          outputs.find(
+            (output) =>
+              typeof output?.relpath === "string" &&
+              output.relpath.endsWith(".parquet")
+          );
+
+        const resolvedRelpath = parquetOutput?.relpath;
+
+        if (!resolvedRelpath || typeof resolvedRelpath !== "string") {
+          throw new Error("Statistical parquet output not available in manifest.");
+        }
+
+        setRelpath(resolvedRelpath);
+
+        const fileBuffer = await http.get<ArrayBuffer>(
+          `/artifacts/${toolId}/${fingerprint}/${resolvedRelpath}`,
+          { responseType: "arraybuffer" }
+        );
+
+        const parsedRows = await parquetReadObjects({
+          file: fileBuffer,
+        });
+
+        setRows((parsedRows ?? []) as Row[]);
+
+        const bucketizersOutput = outputs.find(
+          (output) =>
+            output?.relpath === "outputs/statistical_bucketizers_used.json"
+        );
+
+        const bucketizersRelpath = bucketizersOutput?.relpath;
+
+        if (bucketizersRelpath && typeof bucketizersRelpath === "string") {
+          const rawBucketizersResponse = await http.get<any>(
+            `/artifacts/${toolId}/${fingerprint}/${bucketizersRelpath}`
+          );
+
+          const parsedBucketizersResponse: BucketizersUsedResponse =
+            typeof rawBucketizersResponse === "string"
+              ? JSON.parse(rawBucketizersResponse)
+              : rawBucketizersResponse;
+
+          setBucketizersUsed(parsedBucketizersResponse?.bucketizers ?? null);
+        }
+      } catch (err: any) {
+        setError(err?.message ?? "Failed to load statistical results.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
+  }, [toolId, fingerprint, http]);
+
+  if (loading) {
+    return <div style={{ padding: 24 }}>Loading statistical results...</div>;
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: 24, color: "red" }}>
+        Error: {error}
+      </div>
+    );
+  }
+
+  
+  return (
+    <div
+      style={{
+        padding: 24,
+        width: "100%",
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ marginBottom: "var(--s-5)" }}>
+        <h1 style={{ marginTop: 0, marginBottom: 8 }}>Statistical Results</h1>
+
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <span className="pill">Run: {fingerprint?.slice(0, 10)}</span>
+          <span className="pill">Tool: {toolId}</span>
+          <span className="pill">Output: {relpath ?? "n/a"}</span>
+          <span className="pill">Rows: {rows.length}</span>
+          <span className="pill">Columns: {allColumns.length}</span>
+        </div>
+      </div>
+      <StatisticalKpiGrid
+        total={total}
+        targetColumns={targetColumns.length}
+        avgMaxExcursion={avgMaxExcursion}
+        avgBreakoutEfficiency={avgBreakoutEfficiency}
+        cleanQuantRate={cleanQuantPct}
+      />
+
+      {targetColumns.length > 0 && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: "var(--s-4)",
+            marginBottom: 20,
+          }}
+        >
+          {directTargetRateData.length > 0 && (
+            <div
+              onClick={() =>
+                setExpandedChart({
+                  title: "Direct Target Success",
+                  content: (
+                    <StatisticalBarChart
+                      title="Direct Target Success"
+                      data={directTargetRateData}
+                    />
+                  ),
+                })
+              }
+              style={{ cursor: "zoom-in" }}
+            >
+              <StatisticalBarChart
+                title="Direct Target Success"
+                data={directTargetRateData}
+              />
+            </div>
+          )}
+
+          {atrScanRateData.length > 0 && (
+            <div
+              onClick={() =>
+                setExpandedChart({
+                  title: "ATR Scan Success",
+                  content: (
+                    <StatisticalBarChart
+                      title="ATR Scan Success"
+                      data={atrScanRateData}
+                    />
+                  ),
+                })
+              }
+              style={{ cursor: "zoom-in" }}
+            >
+              <StatisticalBarChart
+                title="ATR Scan Success"
+                data={atrScanRateData}
+              />
+            </div>
+          )}
+
+          {tickScanRateData.length > 0 && (
+            <div
+              onClick={() =>
+                setExpandedChart({
+                  title: "Tick Scan Success",
+                  content: (
+                    <StatisticalBarChart
+                      title="Tick Scan Success"
+                      data={tickScanRateData}
+                    />
+                  ),
+                })
+              }
+              style={{ cursor: "zoom-in" }}
+            >
+              <StatisticalBarChart
+                title="Tick Scan Success"
+                data={tickScanRateData}
+              />
+            </div>
+          )}
+
+          {cleanTickRateData.length > 0 && (
+            <div
+              onClick={() =>
+                setExpandedChart({
+                  title: "Clean Tick Targets",
+                  content: (
+                    <StatisticalBarChart
+                      title="Clean Tick Targets"
+                      data={cleanTickRateData}
+                    />
+                  ),
+                })
+              }
+              style={{ cursor: "zoom-in" }}
+            >
+              <StatisticalBarChart
+                title="Clean Tick Targets"
+                data={cleanTickRateData}
+              />
+            </div>
+          )}
+
+          {cleanQuantSummary !== null && (
+            <div
+              style={{
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 16,
+                padding: 16,
+                background: "rgba(255,255,255,0.02)",
+              }}
+            >
+              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Clean Quant</h3>
+              <div style={{ fontSize: 32, fontWeight: 800 }}>
+                {cleanQuantSummary.toFixed(1)}%
+              </div>
+              <p style={{ marginBottom: 0, opacity: 0.7, fontSize: 13 }}>
+                Quantitative clean-move rate from <code>is_clean_quant</code>.
+                This is separate from clean tick target columns.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {bucketizersUsed && Object.keys(bucketizersUsed).length > 0 && (
+        <div
+          style={{
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 16,
+            padding: 16,
+            background: "rgba(255,255,255,0.02)",
+            marginBottom: 20,
+          }}
+        >
+          <h2 style={{ marginTop: 0, marginBottom: 12 }}>Bucketizers Used</h2>
+
+          {Object.entries(bucketizersUsed)
+            .sort(([a], [b]) => sortBucketizerSections(a, b))
+            .map(([bucketName, bucketConfig]) => (
+              <div key={bucketName} style={{ marginBottom: 12 }}>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                  {formatBucketizerLabel(bucketName)}
+                </div>
+
+                <div style={{ paddingLeft: 8, fontSize: 13, opacity: 0.9 }}>
+                  {Object.entries(bucketConfig).map(
+                    ([thresholdKey, thresholdValue]) => (
+                      <div key={thresholdKey}>
+                        {formatBucketizerLabel(thresholdKey)}:{" "}
+                        {renderBucketizerValue(thresholdValue)}
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
+
+                  <div
+                    style={{
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      borderRadius: 16,
+                      padding: 16,
+                      background: "rgba(255,255,255,0.02)",
+                      marginBottom: 20,
+                    }}
+                  >
+                    <h2 style={{ marginTop: 0, marginBottom: 12 }}>Statistical Overview</h2>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                        gap: "var(--s-4)",
+                      }}
+                    >
+                      {"breakout_outcome" in (rows[0] ?? {}) && (
+                        <div
+                          onClick={() =>
+                            setExpandedChart({
+                              title: "Outcome Distribution",
+                              content: (
+                                <StatisticalBarChart
+                                  title="Outcome Distribution"
+                                  data={distribution(rows, "breakout_outcome").map((d) => ({
+                                    name: d.key,
+                                    value: d.count,
+                                  }))}
+                                />
+                              ),
+                            })
+                          }
+                          style={{ cursor: "zoom-in" }}
+                        >
+                          <StatisticalBarChart
+                            title="Outcome Distribution"
+                            data={distribution(rows, "breakout_outcome").map((d) => ({
+                              name: d.key,
+                              value: d.count,
+                            }))}
+                          />
+                        </div>
+                      )}
+
+                      {"direction" in (rows[0] ?? {}) && (
+                        <div
+                          onClick={() =>
+                            setExpandedChart({
+                              title: "Direction Distribution",
+                              content: (
+                                <StatisticalBarChart
+                                  title="Direction Distribution"
+                                  data={distribution(rows, "direction").map((d) => ({
+                                    name: d.key,
+                                    value: d.count,
+                                  }))}
+                                />
+                              ),
+                            })
+                          }
+                          style={{ cursor: "zoom-in" }}
+                        >
+                          <StatisticalBarChart
+                            title="Direction Distribution"
+                            data={distribution(rows, "direction").map((d) => ({
+                              name: d.key,
+                              value: d.count,
+                            }))}
+                          />
+                        </div>
+                      )}
+
+                      {"weekday" in (rows[0] ?? {}) && (
+                        <div
+                          onClick={() =>
+                            setExpandedChart({
+                              title: "Weekday Distribution",
+                              content: (
+                                <StatisticalBarChart
+                                  title="Weekday Distribution"
+                                  data={distribution(rows, "weekday").map((d) => ({
+                                    name: d.key,
+                                    value: d.count,
+                                  }))}
+                                />
+                              ),
+                            })
+                          }
+                          style={{ cursor: "zoom-in" }}
+                        >
+                          <StatisticalBarChart
+                            title="Weekday Distribution"
+                            data={distribution(rows, "weekday").map((d) => ({
+                              name: d.key,
+                              value: d.count,
+                            }))}
+                          />
+                        </div>
+                      )}
+
+                      {"session_calc" in (rows[0] ?? {}) && (
+                        <div
+                          onClick={() =>
+                            setExpandedChart({
+                              title: "Session Distribution",
+                              content: (
+                                <StatisticalBarChart
+                                  title="Session Distribution"
+                                  data={distribution(rows, "session_calc").map((d) => ({
+                                    name: d.key,
+                                    value: d.count,
+                                  }))}
+                                />
+                              ),
+                            })
+                          }
+                          style={{ cursor: "zoom-in" }}
+                        >
+                          <StatisticalBarChart
+                            title="Session Distribution"
+                            data={distribution(rows, "session_calc").map((d) => ({
+                              name: d.key,
+                              value: d.count,
+                            }))}
+                          />
+                        </div>
+                      )}
+
+                      {"side" in (rows[0] ?? {}) && (
+                        <div
+                          onClick={() =>
+                            setExpandedChart({
+                              title: "Side Distribution",
+                              content: (
+                                <StatisticalBarChart
+                                  title="Side Distribution"
+                                  data={distribution(rows, "side").map((d) => ({
+                                    name: d.key,
+                                    value: d.count,
+                                  }))}
+                                />
+                              ),
+                            })
+                          }
+                          style={{ cursor: "zoom-in" }}
+                        >
+                          <StatisticalBarChart
+                            title="Side Distribution"
+                            data={distribution(rows, "side").map((d) => ({
+                              name: d.key,
+                              value: d.count,
+                            }))}
+                          />
+                        </div>
+                      )}
+
+                      {"weekday" in (rows[0] ?? {}) &&
+                        "atr_before" in (rows[0] ?? {}) && (
+                          <div
+                            onClick={() =>
+                              setExpandedChart({
+                                title: "Avg ATR by Weekday",
+                                content: (
+                                  <StatisticalBarChart
+                                    title="Avg ATR by Weekday"
+                                    data={avgByGroup(rows, "weekday", "atr_before").map((d) => ({
+                                      name: d.key,
+                                      value: d.avg ?? 0,
+                                    }))}
+                                  />
+                                ),
+                              })
+                            }
+                            style={{ cursor: "zoom-in" }}
+                          >
+                            <StatisticalBarChart
+                              title="Avg ATR by Weekday"
+                              data={avgByGroup(rows, "weekday", "atr_before").map((d) => ({
+                                name: d.key,
+                                value: d.avg ?? 0,
+                              }))}
+                            />
+                          </div>
+                        )}
+
+                      {"weekday" in (rows[0] ?? {}) &&
+                        "max_excursion" in (rows[0] ?? {}) && (
+                          <div
+                            onClick={() =>
+                              setExpandedChart({
+                                title: "Avg Max Excursion by Weekday",
+                                content: (
+                                  <StatisticalBarChart
+                                    title="Avg Max Excursion by Weekday"
+                                    data={avgByGroup(rows, "weekday", "max_excursion").map((d) => ({
+                                      name: d.key,
+                                      value: d.avg ?? 0,
+                                    }))}
+                                  />
+                                ),
+                              })
+                            }
+                            style={{ cursor: "zoom-in" }}
+                          >
+                            <StatisticalBarChart
+                              title="Avg Max Excursion by Weekday"
+                              data={avgByGroup(rows, "weekday", "max_excursion").map((d) => ({
+                                name: d.key,
+                                value: d.avg ?? 0,
+                              }))}
+                            />
+                          </div>
+                        )}
+
+                      {"max_excursion" in (rows[0] ?? {}) && (
+                        <div
+                          style={{
+                            border: "1px solid rgba(255,255,255,0.12)",
+                            borderRadius: 16,
+                            padding: 16,
+                            background: "rgba(255,255,255,0.02)",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 12,
+                          }}
+                        >
+                          <h3 style={{ margin: 0 }}>Max Excursion</h3>
+
+                          {(() => {
+                            const s = numericSummary(rows, "max_excursion");
+                            if (!s) return null;
+
+                            return (
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 16,
+                                  justifyContent: "space-between",
+                                  height: "100%",
+                                }}
+                              >
+                                <div>
+                                  <div style={{ fontSize: "var(--font-sm)", color: "var(--muted)", marginBottom: 6 }}>
+                                    Average
+                                  </div>
+                                  <div style={{ fontSize: "32px", fontWeight: 800, lineHeight: 1 }}>
+                                    {s.avg?.toFixed(2)}
+                                  </div>
+                                </div>
+
+                                <div
+                                  style={{
+                                    height: 8,
+                                    borderRadius: 999,
+                                    background: "rgba(255,255,255,0.08)",
+                                    overflow: "hidden",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      borderRadius: 999,
+                                      background: "linear-gradient(90deg, rgba(239,68,68,0.7), rgba(96,165,250,0.8))",
+                                    }}
+                                  />
+                                </div>
+
+                                <div
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                                    gap: 12,
+                                  }}
+                                >
+                                  <div>
+                                    <div style={{ fontSize: "var(--font-sm)", color: "var(--muted)" }}>
+                                      Min
+                                    </div>
+                                    <div style={{ fontSize: "var(--font-lg)", fontWeight: 700 }}>
+                                      {s.min}
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <div style={{ fontSize: "var(--font-sm)", color: "var(--muted)" }}>
+                                      Max
+                                    </div>
+                                    <div style={{ fontSize: "var(--font-lg)", fontWeight: 700 }}>
+                                      {s.max}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      borderRadius: 16,
+                      padding: 16,
+                      background: "rgba(255,255,255,0.02)",
+                      marginBottom: 20,
+                    }}
+                  >
+                    <h2 style={{ marginTop: 0, marginBottom: 12 }}>
+                      Outcome and Performance Analysis
+                    </h2>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                        gap: "var(--s-4)",
+                      }}
+                    >
+                      {"breakout_outcome" in (rows[0] ?? {}) &&
+                        "atr_bucket" in (rows[0] ?? {}) && (
+                          <div
+                            onClick={() =>
+                              setExpandedChart({
+                                title: "Outcome by ATR Bucket",
+                                content: (
+                                  <StatisticalStackedBarChart
+                                    title="Outcome by ATR Bucket"
+                                    data={groupByTwo(rows, "atr_bucket", "breakout_outcome").map(
+                                      (group) => {
+                                        const row: {
+                                          name: string;
+                                          true_breakout?: number;
+                                          failed_follow_through?: number;
+                                          false_breakout?: number;
+                                        } = {
+                                          name: group.key,
+                                        };
+
+                                        group.values.forEach((value) => {
+                                          if (value.key === "true_breakout") {
+                                            row.true_breakout = value.count;
+                                          }
+
+                                          if (value.key === "failed_follow_through") {
+                                            row.failed_follow_through = value.count;
+                                          }
+
+                                          if (value.key === "false_breakout") {
+                                            row.false_breakout = value.count;
+                                          }
+                                        });
+
+                                        return row;
+                                      }
+                                    )}
+                                  />
+                                ),
+                              })
+                            }
+                            style={{ cursor: "zoom-in" }}
+                          >
+                            <StatisticalStackedBarChart
+                              title="Outcome by ATR Bucket"
+                              data={groupByTwo(rows, "atr_bucket", "breakout_outcome").map(
+                                (group) => {
+                                  const row: {
+                                    name: string;
+                                    true_breakout?: number;
+                                    failed_follow_through?: number;
+                                    false_breakout?: number;
+                                  } = {
+                                    name: group.key,
+                                  };
+
+                                  group.values.forEach((value) => {
+                                    if (value.key === "true_breakout") {
+                                      row.true_breakout = value.count;
+                                    }
+
+                                    if (value.key === "failed_follow_through") {
+                                      row.failed_follow_through = value.count;
+                                    }
+
+                                    if (value.key === "false_breakout") {
+                                      row.false_breakout = value.count;
+                                    }
+                                  });
+
+                                  return row;
+                                }
+                              )}
+                            />
+                          </div>
+                        )}
+
+                      {"breakout_outcome" in (rows[0] ?? {}) &&
+                        "session_calc" in (rows[0] ?? {}) && (
+                          <div
+                            onClick={() =>
+                              setExpandedChart({
+                                title: "Outcome by Session",
+                                content: (
+                                  <StatisticalStackedBarChart
+                                    title="Outcome by Session"
+                                    data={groupByTwo(rows, "session_calc", "breakout_outcome").map(
+                                      (group) => {
+                                        const row: {
+                                          name: string;
+                                          true_breakout?: number;
+                                          failed_follow_through?: number;
+                                          false_breakout?: number;
+                                        } = {
+                                          name: group.key,
+                                        };
+
+                                        group.values.forEach((value) => {
+                                          if (value.key === "true_breakout") row.true_breakout = value.count;
+                                          if (value.key === "failed_follow_through") row.failed_follow_through = value.count;
+                                          if (value.key === "false_breakout") row.false_breakout = value.count;
+                                        });
+
+                                        return row;
+                                      }
+                                    )}
+                                  />
+                                ),
+                              })
+                            }
+                            style={{ cursor: "zoom-in" }}
+                          >
+                            <StatisticalStackedBarChart
+                              title="Outcome by Session"
+                              data={groupByTwo(rows, "session_calc", "breakout_outcome").map((group) => {
+                                const row: {
+                                  name: string;
+                                  true_breakout?: number;
+                                  failed_follow_through?: number;
+                                  false_breakout?: number;
+                                } = {
+                                  name: group.key,
+                                };
+
+                                group.values.forEach((value) => {
+                                  if (value.key === "true_breakout") row.true_breakout = value.count;
+                                  if (value.key === "failed_follow_through") row.failed_follow_through = value.count;
+                                  if (value.key === "false_breakout") row.false_breakout = value.count;
+                                });
+
+                                return row;
+                              })}
+                            />
+                          </div>
+                        )}
+
+                      {"breakout_outcome" in (rows[0] ?? {}) &&
+                        "weekday" in (rows[0] ?? {}) && (
+                          <div
+                            onClick={() =>
+                              setExpandedChart({
+                                title: "Outcome by Weekday",
+                                content: (
+                                  <StatisticalStackedBarChart
+                                    title="Outcome by Weekday"
+                                    data={groupByTwo(rows, "weekday", "breakout_outcome").map((group) => {
+                                      const row: {
+                                        name: string;
+                                        true_breakout?: number;
+                                        failed_follow_through?: number;
+                                        false_breakout?: number;
+                                      } = {
+                                        name: group.key,
+                                      };
+
+                                      group.values.forEach((value) => {
+                                        if (value.key === "true_breakout") row.true_breakout = value.count;
+                                        if (value.key === "failed_follow_through") row.failed_follow_through = value.count;
+                                        if (value.key === "false_breakout") row.false_breakout = value.count;
+                                      });
+
+                                      return row;
+                                    })}
+                                  />
+                                ),
+                              })
+                            }
+                            style={{ cursor: "zoom-in" }}
+                          >
+                            <StatisticalStackedBarChart
+                              title="Outcome by Weekday"
+                              data={groupByTwo(rows, "weekday", "breakout_outcome").map((group) => {
+                                const row: {
+                                  name: string;
+                                  true_breakout?: number;
+                                  failed_follow_through?: number;
+                                  false_breakout?: number;
+                                } = {
+                                  name: group.key,
+                                };
+
+                                group.values.forEach((value) => {
+                                  if (value.key === "true_breakout") row.true_breakout = value.count;
+                                  if (value.key === "failed_follow_through") row.failed_follow_through = value.count;
+                                  if (value.key === "false_breakout") row.false_breakout = value.count;
+                                });
+
+                                return row;
+                              })}
+                            />
+                          </div>
+                        )}
+
+                      {"breakout_outcome" in (rows[0] ?? {}) &&
+                        "side" in (rows[0] ?? {}) && (
+                          <div
+                            onClick={() =>
+                              setExpandedChart({
+                                title: "Outcome by Side",
+                                content: (
+                                  <StatisticalStackedBarChart
+                                    title="Outcome by Side"
+                                    data={groupByTwo(rows, "side", "breakout_outcome").map((group) => {
+                                      const row: {
+                                        name: string;
+                                        true_breakout?: number;
+                                        failed_follow_through?: number;
+                                        false_breakout?: number;
+                                      } = {
+                                        name: group.key,
+                                      };
+
+                                      group.values.forEach((value) => {
+                                        if (value.key === "true_breakout") row.true_breakout = value.count;
+                                        if (value.key === "failed_follow_through") row.failed_follow_through = value.count;
+                                        if (value.key === "false_breakout") row.false_breakout = value.count;
+                                      });
+
+                                      return row;
+                                    })}
+                                  />
+                                ),
+                              })
+                            }
+                            style={{ cursor: "zoom-in" }}
+                          >
+                            <StatisticalStackedBarChart
+                              title="Outcome by Side"
+                              data={groupByTwo(rows, "side", "breakout_outcome").map((group) => {
+                                const row: {
+                                  name: string;
+                                  true_breakout?: number;
+                                  failed_follow_through?: number;
+                                  false_breakout?: number;
+                                } = {
+                                  name: group.key,
+                                };
+
+                                group.values.forEach((value) => {
+                                  if (value.key === "true_breakout") row.true_breakout = value.count;
+                                  if (value.key === "failed_follow_through") row.failed_follow_through = value.count;
+                                  if (value.key === "false_breakout") row.false_breakout = value.count;
+                                });
+
+                                return row;
+                              })}
+                            />
+                          </div>
+                        )}
+
+                      {"session_calc" in (rows[0] ?? {}) &&
+                        "max_excursion" in (rows[0] ?? {}) && (
+                          <div
+                            onClick={() =>
+                              setExpandedChart({
+                                title: "Avg Max Excursion by Session",
+                                content: (
+                                  <StatisticalBarChart
+                                    title="Avg Max Excursion by Session"
+                                    data={Object.entries(groupBy(rows, "session_calc")).map(
+                                      ([key, groupRows]: any) => {
+                                        const values = groupRows
+                                          .map((r: any) => Number(r.max_excursion))
+                                          .filter((v: number) => !isNaN(v));
+
+                                        const mean =
+                                          values.length > 0
+                                            ? values.reduce((a: number, b: number) => a + b, 0) / values.length
+                                            : 0;
+
+                                        return {
+                                          name: key,
+                                          value: Number(mean.toFixed(2)),
+                                        };
+                                      }
+                                    )}
+                                  />
+                                ),
+                              })
+                            }
+                            style={{
+                              border: "1px solid rgba(255,255,255,0.12)",
+                              borderRadius: 16,
+                              padding: 16,
+                              background: "rgba(255,255,255,0.02)",
+                              cursor: "zoom-in",
+                            }}
+                          >
+                            <StatisticalBarChart
+                              title="Avg Max Excursion by Session"
+                              data={Object.entries(groupBy(rows, "session_calc")).map(
+                                ([key, groupRows]: any) => {
+                                  const values = groupRows
+                                    .map((r: any) => Number(r.max_excursion))
+                                    .filter((v: number) => !isNaN(v));
+
+                                  const mean =
+                                    values.length > 0
+                                      ? values.reduce((a: number, b: number) => a + b, 0) / values.length
+                                      : 0;
+
+                                  return {
+                                    name: key,
+                                    value: Number(mean.toFixed(2)),
+                                  };
+                                }
+                              )}
+                            />
+                          </div>
+                        )}
+
+                      {"session_calc" in (rows[0] ?? {}) &&
+                        "atr_before" in (rows[0] ?? {}) && (
+                          <div
+                            onClick={() =>
+                              setExpandedChart({
+                                title: "Avg ATR by Session",
+                                content: (
+                                  <StatisticalBarChart
+                                    title="Avg ATR by Session"
+                                    data={Object.entries(groupBy(rows, "session_calc")).map(
+                                      ([key, groupRows]: any) => {
+                                        const values = groupRows
+                                          .map((r: any) => Number(r.atr_before))
+                                          .filter((v: number) => !isNaN(v));
+
+                                        const mean =
+                                          values.length > 0
+                                            ? values.reduce((a: number, b: number) => a + b, 0) / values.length
+                                            : 0;
+
+                                        return {
+                                          name: key,
+                                          value: Number(mean.toFixed(2)),
+                                        };
+                                      }
+                                    )}
+                                  />
+                                ),
+                              })
+                            }
+                            style={{
+                              border: "1px solid rgba(255,255,255,0.12)",
+                              borderRadius: 16,
+                              padding: 16,
+                              background: "rgba(255,255,255,0.02)",
+                              cursor: "zoom-in",
+                            }}
+                          >
+                            <StatisticalBarChart
+                              title="Avg ATR by Session"
+                              data={Object.entries(groupBy(rows, "session_calc")).map(
+                                ([key, groupRows]: any) => {
+                                  const values = groupRows
+                                    .map((r: any) => Number(r.atr_before))
+                                    .filter((v: number) => !isNaN(v));
+
+                                  const mean =
+                                    values.length > 0
+                                      ? values.reduce((a: number, b: number) => a + b, 0) / values.length
+                                      : 0;
+
+                                  return {
+                                    name: key,
+                                    value: Number(mean.toFixed(2)),
+                                  };
+                                }
+                              )}
+                            />
+                          </div>
+                        )}
+
+                      {"breakout_outcome" in (rows[0] ?? {}) &&
+                        "max_excursion" in (rows[0] ?? {}) && (
+                          <div
+                            onClick={() =>
+                              setExpandedChart({
+                                title: "Avg Max Excursion by Outcome",
+                                content: (
+                                  <StatisticalBarChart
+                                    title="Avg Max Excursion by Outcome"
+                                    data={Object.entries(groupBy(rows, "breakout_outcome")).map(
+                                      ([key, groupRows]: any) => {
+                                        const values = groupRows
+                                          .map((r: any) => Number(r.max_excursion))
+                                          .filter((v: number) => !isNaN(v));
+
+                                        const mean =
+                                          values.length > 0
+                                            ? values.reduce((a: number, b: number) => a + b, 0) / values.length
+                                            : 0;
+
+                                        return {
+                                          name: key,
+                                          value: Number(mean.toFixed(2)),
+                                        };
+                                      }
+                                    )}
+                                  />
+                                ),
+                              })
+                            }
+                            style={{
+                              border: "1px solid rgba(255,255,255,0.12)",
+                              borderRadius: 16,
+                              padding: 16,
+                              background: "rgba(255,255,255,0.02)",
+                              cursor: "zoom-in",
+                            }}
+                          >
+                            <StatisticalBarChart
+                              title="Avg Max Excursion by Outcome"
+                              data={Object.entries(groupBy(rows, "breakout_outcome")).map(
+                                ([key, groupRows]: any) => {
+                                  const values = groupRows
+                                    .map((r: any) => Number(r.max_excursion))
+                                    .filter((v: number) => !isNaN(v));
+
+                                  const mean =
+                                    values.length > 0
+                                      ? values.reduce((a: number, b: number) => a + b, 0) / values.length
+                                      : 0;
+
+                                  return {
+                                    name: key,
+                                    value: Number(mean.toFixed(2)),
+                                  };
+                                }
+                              )}
+                            />
+                          </div>
+                        )}
+
+                      {"session_calc" in (rows[0] ?? {}) &&
+                        "breakout_outcome" in (rows[0] ?? {}) &&
+                        "max_excursion" in (rows[0] ?? {}) && (
+                          <div
+                            style={{
+                              border: "1px solid rgba(255,255,255,0.12)",
+                              borderRadius: 16,
+                              padding: 16,
+                              background: "rgba(255,255,255,0.02)",
+                              gridColumn: "span 2",
+                            }}
+                          >
+                            <h3 style={{ marginTop: 0, marginBottom: 12 }}>
+                              Avg Max Excursion by Session & Outcome
+                            </h3>
+
+                            <div style={{ display: "grid", gap: 10 }}>
+                              {Object.entries(groupBy(rows, "session_calc")).map(([session, sessionRows]) => {
+                                const grouped = groupBy(sessionRows as any[], "breakout_outcome");
+
+                                return (
+                                  <div key={session}>
+                                    <div style={{ fontWeight: 700, marginBottom: 6 }}>{session}</div>
+
+                                    <div style={{ display: "grid", gap: 6 }}>
+                                      {Object.entries(grouped).map(([outcome, outcomeRows]) => {
+                                        const group = outcomeRows as any[];
+
+                                        const values = group
+                                          .map((r: any) => Number(r.max_excursion))
+                                          .filter((v: number) => !isNaN(v));
+
+                                        const mean =
+                                          values.length > 0
+                                            ? values.reduce((a: number, b: number) => a + b, 0) / values.length
+                                            : 0;
+
+                                        const barColor =
+                                          outcome === "true_breakout"
+                                            ? "#22c55e"
+                                            : outcome === "false_breakout"
+                                            ? "#ef4444"
+                                            : "#f59e0b";
+
+                                        return (
+                                          <div key={outcome}>
+                                            <div
+                                              style={{
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                gap: 12,
+                                                fontSize: 13,
+                                                marginBottom: 4,
+                                              }}
+                                            >
+                                              <span>{outcome}</span>
+                                              <span>{mean.toFixed(2)}</span>
+                                            </div>
+
+                                            <div
+                                              style={{
+                                                width: "100%",
+                                                height: 8,
+                                                borderRadius: 999,
+                                                background: "rgba(255,255,255,0.08)",
+                                                overflow: "hidden",
+                                              }}
+                                            >
+                                              <div
+                                                style={{
+                                                  width: `${Math.min(mean * 3, 100)}%`,
+                                                  height: "100%",
+                                                  borderRadius: 999,
+                                                  background: barColor,
+                                                }}
+                                              />
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                      <div
+                      style={{
+                        gridColumn: "span 2",
+                        display: "grid",
+                        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                        gap: "var(--s-4)",
+                        alignSelf: "start",
+                      }}
+                    >
+                      {"session_calc" in (rows[0] ?? {}) &&
+                        "breakout_outcome" in (rows[0] ?? {}) && (
+                          <div
+                            onClick={() =>
+                              setExpandedChart({
+                                title: "Win Rate by Session",
+                                content: (
+                                  <StatisticalBarChart
+                                    title="Win Rate by Session"
+                                    data={Object.entries(groupBy(rows, "session_calc")).map(
+                                      ([session, sessionRows]) => {
+                                        const group = sessionRows as any[];
+                                        const total = group.length;
+                                        const wins = group.filter(
+                                          (r: any) => r.breakout_outcome === "true_breakout"
+                                        ).length;
+                                        const localWinRate = total > 0 ? (wins / total) * 100 : 0;
+
+                                        return {
+                                          name: session,
+                                          value: Number(localWinRate.toFixed(1)),
+                                        };
+                                      }
+                                    )}
+                                  />
+                                ),
+                              })
+                            }
+                            style={{ cursor: "zoom-in" }}
+                          >
+                            <StatisticalBarChart
+                              title="Win Rate by Session"
+                              data={Object.entries(groupBy(rows, "session_calc")).map(
+                                ([session, sessionRows]) => {
+                                  const group = sessionRows as any[];
+                                  const total = group.length;
+                                  const wins = group.filter(
+                                    (r: any) => r.breakout_outcome === "true_breakout"
+                                  ).length;
+                                  const localWinRate = total > 0 ? (wins / total) * 100 : 0;
+
+                                  return {
+                                    name: session,
+                                    value: Number(localWinRate.toFixed(1)),
+                                  };
+                                }
+                              )}
+                            />
+                          </div>
+                        )}
+
+                      {"initial_delta" in (rows[0] ?? {}) && (
+                        <div
+                          onClick={() =>
+                            setExpandedChart({
+                              title: "Win Rate by Delta Sign",
+                              content: (
+                                <StatisticalBarChart
+                                  title="Win Rate by Delta Sign"
+                                  data={Object.entries(
+                                    groupBy(
+                                      rows.map((r) => ({
+                                        ...r,
+                                        delta_sign: getDeltaSign((r as any).initial_delta),
+                                      })),
+                                      "delta_sign"
+                                    )
+                                  ).map(([sign, groupRows]) => {
+                                    const group = groupRows as any[];
+                                    const total = group.length;
+                                    const wins = group.filter(
+                                      (r: any) => r.breakout_outcome === "true_breakout"
+                                    ).length;
+                                    const localWinRate = total > 0 ? (wins / total) * 100 : 0;
+
+                                    return {
+                                      name: sign,
+                                      value: Number(localWinRate.toFixed(1)),
+                                    };
+                                  })}
+                                />
+                              ),
+                            })
+                          }
+                          style={{ cursor: "zoom-in" }}
+                        >
+                          <StatisticalBarChart
+                            title="Win Rate by Delta Sign"
+                            data={Object.entries(
+                              groupBy(
+                                rows.map((r) => ({
+                                  ...r,
+                                  delta_sign: getDeltaSign((r as any).initial_delta),
+                                })),
+                                "delta_sign"
+                              )
+                            ).map(([sign, groupRows]) => {
+                              const group = groupRows as any[];
+                              const total = group.length;
+                              const wins = group.filter(
+                                (r: any) => r.breakout_outcome === "true_breakout"
+                              ).length;
+                              const localWinRate = total > 0 ? (wins / total) * 100 : 0;
+
+                              return {
+                                name: sign,
+                                value: Number(localWinRate.toFixed(1)),
+                              };
+                            })}
+                          />
+                        </div>
+                      )}
+
+                      {"initial_delta" in (rows[0] ?? {}) &&
+                        "max_excursion" in (rows[0] ?? {}) && (
+                          <div
+                            onClick={() =>
+                              setExpandedChart({
+                                title: "Avg Excursion by Delta Sign",
+                                content: (
+                                  <StatisticalBarChart
+                                    title="Avg Excursion by Delta Sign"
+                                    data={Object.entries(
+                                      groupBy(
+                                        rows.map((r) => ({
+                                          ...r,
+                                          delta_sign: getDeltaSign((r as any).initial_delta),
+                                        })),
+                                        "delta_sign"
+                                      )
+                                    ).map(([sign, groupRows]) => {
+                                      const group = groupRows as any[];
+                                      const values = group
+                                        .map((r: any) => Number(r.max_excursion))
+                                        .filter((v: number) => !isNaN(v));
+
+                                      const avgValue =
+                                        values.length > 0
+                                          ? values.reduce((a: number, b: number) => a + b, 0) / values.length
+                                          : 0;
+
+                                      return {
+                                        name: sign,
+                                        value: Number(avgValue.toFixed(2)),
+                                      };
+                                    })}
+                                  />
+                                ),
+                              })
+                            }
+                            style={{ cursor: "zoom-in" }}
+                          >
+                            <StatisticalBarChart
+                              title="Avg Excursion by Delta Sign"
+                              data={Object.entries(
+                                groupBy(
+                                  rows.map((r) => ({
+                                    ...r,
+                                    delta_sign: getDeltaSign((r as any).initial_delta),
+                                  })),
+                                  "delta_sign"
+                                )
+                              ).map(([sign, groupRows]) => {
+                                const group = groupRows as any[];
+                                const values = group
+                                  .map((r: any) => Number(r.max_excursion))
+                                  .filter((v: number) => !isNaN(v));
+
+                                const avgValue =
+                                  values.length > 0
+                                    ? values.reduce((a: number, b: number) => a + b, 0) / values.length
+                                    : 0;
+
+                                return {
+                                  name: sign,
+                                  value: Number(avgValue.toFixed(2)),
+                                };
+                              })}
+                            />
+                          </div>
+                        )}
+
+                      
+                            
+                    </div>
+                  </div>
+                </div>
+      {/* =========================
+          VOLUME & DELTA ANALYSIS
+      ========================= */}
+
+      <div
+        style={{
+          border: "1px solid rgba(255,255,255,0.12)",
+          borderRadius: 16,
+          padding: 16,
+          background: "rgba(255,255,255,0.02)",
+          marginBottom: 20,
+        }}
+      >
+        <h2 style={{ marginTop: 0, marginBottom: 12 }}>
+          Volume and Delta Analysis
+        </h2>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: "var(--s-4)",
+            marginBottom: "var(--s-4)",
+          }}
+        >
+          {"volume_bucket" in (rows[0] ?? {}) && (
+            <div
+              onClick={() =>
+                setExpandedChart({
+                  title: "Win Rate by Volume Bucket",
+                  content: (
+                    <StatisticalBarChart
+                      title="Win Rate by Volume Bucket"
+                      data={Object.entries(groupBy(rows, "volume_bucket"))
+                        .sort(([a], [b]) => sortVolumeBuckets(a, b))
+                        .map(([bucket, bucketRows]) => {
+                          const group = bucketRows as any[];
+                          const total = group.length;
+
+                          const wins = group.filter(
+                            (r: any) => r.breakout_outcome === "true_breakout"
+                          ).length;
+
+                          const localWinRate = total > 0 ? (wins / total) * 100 : 0;
+
+                          return {
+                            name: formatVolumeBucketLabel(bucket),
+                            value: Number(localWinRate.toFixed(1)),
+                          };
+                        })}
+                    />
+                  ),
+                })
+              }
+              style={{ cursor: "zoom-in" }}
+            >
+              <StatisticalBarChart
+                title="Win Rate by Volume Bucket"
+                data={Object.entries(groupBy(rows, "volume_bucket"))
+                  .sort(([a], [b]) => sortVolumeBuckets(a, b))
+                  .map(([bucket, bucketRows]) => {
+                    const group = bucketRows as any[];
+                    const total = group.length;
+
+                    const wins = group.filter(
+                      (r: any) => r.breakout_outcome === "true_breakout"
+                    ).length;
+
+                    const localWinRate = total > 0 ? (wins / total) * 100 : 0;
+
+                    return {
+                      name: formatVolumeBucketLabel(bucket),
+                      value: Number(localWinRate.toFixed(1)),
+                    };
+                  })}
+              />
+            </div>
+          )}
+
+          {"delta_bucket" in (rows[0] ?? {}) && (
+            <div
+              onClick={() =>
+                setExpandedChart({
+                  title: "Win Rate by Delta Bucket",
+                  content: (
+                    <StatisticalBarChart
+                      title="Win Rate by Delta Bucket"
+                      data={Object.entries(groupBy(rows, "delta_bucket"))
+                        .sort(([a], [b]) => sortDeltaBuckets(a, b))
+                        .map(([bucket, bucketRows]) => {
+                          const group = bucketRows as any[];
+                          const total = group.length;
+
+                          const wins = group.filter(
+                            (r: any) => r.breakout_outcome === "true_breakout"
+                          ).length;
+
+                          const localWinRate = total > 0 ? (wins / total) * 100 : 0;
+
+                          return {
+                            name: formatDeltaBucketLabel(bucket),
+                            value: Number(localWinRate.toFixed(1)),
+                          };
+                        })}
+                    />
+                  ),
+                })
+              }
+              style={{ cursor: "zoom-in" }}
+            >
+              <StatisticalBarChart
+                title="Win Rate by Delta Bucket"
+                data={Object.entries(groupBy(rows, "delta_bucket"))
+                  .sort(([a], [b]) => sortDeltaBuckets(a, b))
+                  .map(([bucket, bucketRows]) => {
+                    const group = bucketRows as any[];
+                    const total = group.length;
+
+                    const wins = group.filter(
+                      (r: any) => r.breakout_outcome === "true_breakout"
+                    ).length;
+
+                    const localWinRate = total > 0 ? (wins / total) * 100 : 0;
+
+                    return {
+                      name: formatDeltaBucketLabel(bucket),
+                      value: Number(localWinRate.toFixed(1)),
+                    };
+                  })}
+              />
+            </div>
+          )}
+
+          {"volume_bucket" in (rows[0] ?? {}) &&
+            "max_excursion" in (rows[0] ?? {}) && (
+              <div
+                onClick={() =>
+                  setExpandedChart({
+                    title: "Avg Excursion by Volume Bucket",
+                    content: (
+                      <StatisticalBarChart
+                        title="Avg Excursion by Volume Bucket"
+                        data={Object.entries(groupBy(rows, "volume_bucket"))
+                          .sort(([a], [b]) => sortVolumeBuckets(a, b))
+                          .map(([bucket, bucketRows]) => {
+                            const group = bucketRows as any[];
+
+                            const values = group
+                              .map((r: any) => Number(r.max_excursion))
+                              .filter((v: number) => !isNaN(v));
+
+                            const avgValue =
+                              values.length > 0
+                                ? values.reduce((a: number, b: number) => a + b, 0) / values.length
+                                : 0;
+
+                            return {
+                              name: formatVolumeBucketLabel(bucket),
+                              value: Number(avgValue.toFixed(2)),
+                            };
+                          })}
+                      />
+                    ),
+                  })
+                }
+                style={{ cursor: "zoom-in" }}
+              >
+                <StatisticalBarChart
+                  title="Avg Excursion by Volume Bucket"
+                  data={Object.entries(groupBy(rows, "volume_bucket"))
+                    .sort(([a], [b]) => sortVolumeBuckets(a, b))
+                    .map(([bucket, bucketRows]) => {
+                      const group = bucketRows as any[];
+
+                      const values = group
+                        .map((r: any) => Number(r.max_excursion))
+                        .filter((v: number) => !isNaN(v));
+
+                      const avgValue =
+                        values.length > 0
+                          ? values.reduce((a: number, b: number) => a + b, 0) / values.length
+                          : 0;
+
+                      return {
+                        name: formatVolumeBucketLabel(bucket),
+                        value: Number(avgValue.toFixed(2)),
+                      };
+                    })}
+                />
+              </div>
+            )}
+
+          {"delta_bucket" in (rows[0] ?? {}) &&
+            "max_excursion" in (rows[0] ?? {}) && (
+              <div
+                onClick={() =>
+                  setExpandedChart({
+                    title: "Avg Excursion by Delta Bucket",
+                    content: (
+                      <StatisticalBarChart
+                        title="Avg Excursion by Delta Bucket"
+                        data={Object.entries(groupBy(rows, "delta_bucket"))
+                          .sort(([a], [b]) => sortDeltaBuckets(a, b))
+                          .map(([bucket, bucketRows]) => {
+                            const group = bucketRows as any[];
+
+                            const values = group
+                              .map((r: any) => Number(r.max_excursion))
+                              .filter((v: number) => !isNaN(v));
+
+                            const avgValue =
+                              values.length > 0
+                                ? values.reduce((a: number, b: number) => a + b, 0) / values.length
+                                : 0;
+
+                            return {
+                              name: formatDeltaBucketLabel(bucket),
+                              value: Number(avgValue.toFixed(2)),
+                            };
+                          })}
+                      />
+                    ),
+                  })
+                }
+                style={{ cursor: "zoom-in" }}
+              >
+                <StatisticalBarChart
+                  title="Avg Excursion by Delta Bucket"
+                  data={Object.entries(groupBy(rows, "delta_bucket"))
+                    .sort(([a], [b]) => sortDeltaBuckets(a, b))
+                    .map(([bucket, bucketRows]) => {
+                      const group = bucketRows as any[];
+
+                      const values = group
+                        .map((r: any) => Number(r.max_excursion))
+                        .filter((v: number) => !isNaN(v));
+
+                      const avgValue =
+                        values.length > 0
+                          ? values.reduce((a: number, b: number) => a + b, 0) / values.length
+                          : 0;
+
+                      return {
+                        name: formatDeltaBucketLabel(bucket),
+                        value: Number(avgValue.toFixed(2)),
+                      };
+                    })}
+                />
+              </div>
+            )}
+                   </div>
+
+        {"volume_bucket" in (rows[0] ?? {}) &&
+          "delta_bucket" in (rows[0] ?? {}) && (
+            <div
+              style={{
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 16,
+                padding: 16,
+                background: "rgba(255,255,255,0.02)",
+              }}
+            >
+              <h3 style={{ marginTop: 0, marginBottom: 12 }}>
+                Win Rate Heatmap (Volume × Delta)
+              </h3>
+
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                  <thead>
+                    <tr>
+                      <th style={cellStyle}>Volume \ Delta</th>
+                      {Array.from(
+                        new Set(rows.map((r: any) => r.delta_bucket))
+                      )
+                        .sort(sortDeltaBuckets)
+                        .map((delta) => (
+                          <th key={delta} style={cellStyle}>
+                            {formatDeltaBucketLabel(delta)}
+                          </th>
+                        ))}
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {Object.entries(groupBy(rows, "volume_bucket"))
+                      .sort(([a], [b]) => sortVolumeBuckets(a, b))
+                      .map(([volume, volumeRows]) => {
+                        const groupedDelta = groupBy(volumeRows as any[], "delta_bucket");
+
+                        return (
+                          <tr key={volume}>
+                            <td style={cellStyle}>
+                              <strong>{formatVolumeBucketLabel(volume)}</strong>
+                            </td>
+
+                            {Array.from(
+                              new Set(rows.map((r: any) => r.delta_bucket))
+                            )
+                              .sort(sortDeltaBuckets)
+                              .map((delta) => {
+                                const group = groupedDelta[String(delta)] ?? [];
+
+                                const total = group.length;
+                                const wins = group.filter(
+                                  (r: any) => r.breakout_outcome === "true_breakout"
+                                ).length;
+
+                                const rate = total > 0 ? (wins / total) * 100 : 0;
+
+                                return (
+                                  <td
+                                    key={String(delta)}
+                                    style={{
+                                      ...cellStyle,
+                                      background:
+                                        rate >= 40
+                                          ? "rgba(34,197,94,0.25)"
+                                          : rate >= 15
+                                          ? "rgba(234,179,8,0.25)"
+                                          : total > 0
+                                          ? "rgba(239,68,68,0.25)"
+                                          : "transparent",
+                                    }}
+                                  >
+                                    {total > 0 ? `${rate.toFixed(0)}%` : "-"}
+                                  </td>
+                                );
+                              })}
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+      </div>
+      
+
+      <div
+        style={{
+          border: "1px solid rgba(255,255,255,0.12)",
+          borderRadius: 16,
+          padding: 16,
+          background: "rgba(255,255,255,0.02)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 16,
+            flexWrap: "wrap",
+            marginBottom: 10,
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 18 }}>Rows Preview</h2>
+          <p style={{ margin: 0, opacity: 0.7, fontSize: 13 }}>
+            Showing first {Math.min(rows.length, 50)} of {rows.length} rows
+          </p>
+        </div>
+
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ borderCollapse: "collapse", width: "100%" }}>
+            <thead>
+              <tr>
+                <th style={cellStyle}>#</th>
+                {previewColumns.map((column) => (
+                  <th key={column} style={cellStyle}>
+                    {column}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody>
+              {rows.slice(0, 50).map((row, index) => (
+                <tr key={index}>
+                  <td style={cellStyle}>{index + 1}</td>
+                  {previewColumns.map((column) => (
+                    <td
+                      key={column}
+                      style={{
+                        ...cellStyle,
+                        textAlign:
+                          column === "breakout_price" ||
+                          column === "atr_before" ||
+                          column === "initial_delta" ||
+                          column === "initial_volume" ||
+                          column === "max_excursion" ||
+                          column === "retracement_depth"
+                            ? "right"
+                            : "left",
+                      }}
+                    >
+                      {column === "instrument" ? (
+                        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                          <span
+                            style={{
+                              padding: "2px 8px",
+                              borderRadius: 999,
+                              fontSize: 11,
+                              border: "1px solid rgba(255,255,255,0.12)",
+                              background: "rgba(255,255,255,0.04)",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {String(row.instrument ?? "")}
+                          </span>
+
+                          {"timeframe" in row && row.timeframe != null ? (
+                            <span
+                              style={{
+                                padding: "2px 8px",
+                                borderRadius: 999,
+                                fontSize: 11,
+                                border: "1px solid rgba(255,255,255,0.12)",
+                                background: "rgba(106,167,255,0.10)",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {String(row.timeframe)}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : (
+                        formatCellValue(row[column], column)
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {expandedChart && (
+        <div
+          onClick={() => setExpandedChart(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.72)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+            zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(1200px, 96vw)",
+              maxHeight: "90vh",
+              overflow: "auto",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 20,
+              padding: 20,
+              background: "var(--panel)",
+              boxShadow: "var(--shadow)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 16,
+                marginBottom: 16,
+              }}
+            >
+              <h2 style={{ margin: 0 }}>{expandedChart.title}</h2>
+
+              <button
+                type="button"
+                onClick={() => setExpandedChart(null)}
+                style={{
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  background: "rgba(255,255,255,0.04)",
+                  color: "inherit",
+                  borderRadius: 10,
+                  padding: "8px 12px",
+                  cursor: "pointer",
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            {expandedChart.content}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const cellStyle: React.CSSProperties = {
+  border: "1px solid rgba(255,255,255,0.12)",
+  padding: 8,
+  textAlign: "left",
+  verticalAlign: "top",
+  fontSize: 13,
+};

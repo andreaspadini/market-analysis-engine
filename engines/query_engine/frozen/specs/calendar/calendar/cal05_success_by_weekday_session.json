@@ -1,0 +1,33 @@
+{
+  "name": "cal05_success_by_weekday_session",
+  "dataset": "df_master_enriched",
+  "filters": [],
+  "groupby": [
+    "weekday",
+    "session_name"
+  ],
+  "metrics": [
+    {
+      "kind": "count",
+      "alias": "n"
+    },
+    {
+      "kind": "prob",
+      "col": "success_1ATR",
+      "alias": "p_success_1ATR"
+    }
+  ],
+  "order_by": [
+    [
+      "weekday",
+      "asc"
+    ],
+    [
+      "session_name",
+      "asc"
+    ]
+  ],
+  "limit": null,
+  "timezone": null,
+  "include_time_views": false
+}

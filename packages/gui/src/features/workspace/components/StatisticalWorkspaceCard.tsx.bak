@@ -1,0 +1,291 @@
+import React from "react";
+import { useApi } from "../../../api/ApiProvider";
+import { createWorkspaceClient } from "../api/workspaceClient";
+import type { StatisticalWorkspaceState } from "../model/statisticalWorkspaceState";
+import type {
+  ArtifactRefInput,
+  StatisticalRunRequest,
+} from "../model/workspaceTypes";
+import { ArtifactRefBadge } from "./ArtifactRefBadge";
+import { StepStatusBanner } from "./StepStatusBanner";
+import { ArtifactSelector } from "./ArtifactSelector";
+
+type StatisticalWorkspaceCardProps = {
+  availableRootArtifacts?: ArtifactRefInput[];
+  initialRootArtifactRef?: ArtifactRefInput | null;
+  onArtifactProduced?: (artifactRef: ArtifactRefInput | null) => void;
+};
+
+export function StatisticalWorkspaceCard(
+  props: StatisticalWorkspaceCardProps
+) {
+  const {
+    availableRootArtifacts = [],
+    initialRootArtifactRef = null,
+    onArtifactProduced,
+  } = props;
+  const { o6 } = useApi();
+  const workspaceClient = React.useMemo(() => createWorkspaceClient(o6), [o6]);
+
+  const [rootArtifactInput, setRootArtifactInput] =
+    React.useState<ArtifactRefInput>({
+      tool_id: initialRootArtifactRef?.tool_id ?? "",
+      fingerprint: initialRootArtifactRef?.fingerprint ?? "",
+    });
+
+  const [configText, setConfigText] = React.useState<string>('{\n}');
+
+  const [state, setState] = React.useState<StatisticalWorkspaceState>({
+    loading: false,
+    error: null,
+    lastRunId: null,
+    selectedRootArtifactRef: initialRootArtifactRef,
+    artifactRef: null,
+    status: "IDLE",
+  });
+
+  React.useEffect(() => {
+    if (!initialRootArtifactRef) {
+      return;
+    }
+
+    setRootArtifactInput(initialRootArtifactRef);
+    setState((s) => ({
+      ...s,
+      selectedRootArtifactRef: initialRootArtifactRef,
+    }));
+  }, [initialRootArtifactRef]);
+
+  function safeParse(json: string): Record<string, unknown> | null {
+    try {
+      const parsed = JSON.parse(json);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  function validateArtifactRef(
+    value: ArtifactRefInput
+  ): ArtifactRefInput | null {
+    const tool_id = value.tool_id.trim();
+    const fingerprint = value.fingerprint.trim();
+
+    if (!tool_id || !fingerprint) {
+      return null;
+    }
+
+    return { tool_id, fingerprint };
+  }
+
+  async function handleSubmit() {
+    const root_artifact_ref = validateArtifactRef(rootArtifactInput);
+    const config = safeParse(configText);
+
+    if (!root_artifact_ref) {
+      setState((s) => ({
+        ...s,
+        error: "Root artifact reference is required",
+      }));
+      return;
+    }
+
+    if (!config) {
+      setState((s) => ({
+        ...s,
+        error: "Invalid JSON in config",
+      }));
+      return;
+    }
+
+    const payload: StatisticalRunRequest = {
+      root_artifact_ref,
+      config,
+    };
+
+    setState({
+      loading: true,
+      error: null,
+      lastRunId: null,
+      selectedRootArtifactRef: root_artifact_ref,
+      artifactRef: null,
+      status: "PENDING",
+    });
+
+    try {
+      const response = await workspaceClient.postStatisticalRun(payload);
+
+      setState((s) => ({
+        ...s,
+        loading: true,
+        lastRunId: response.run_id,
+        artifactRef: response.artifact,
+        status: "PENDING",
+      }));
+
+      onArtifactProduced?.(response.artifact);
+    } catch (error: unknown) {
+      let message = "Failed to submit statistical run";
+
+      if (error instanceof Error && error.message) {
+        message = error.message;
+      } else if (
+        typeof error === "object" &&
+        error !== null &&
+        "message" in error &&
+        typeof (error as { message?: unknown }).message === "string"
+      ) {
+        message = (error as { message: string }).message;
+      }
+
+      setState((s) => ({
+        ...s,
+        loading: false,
+        error: message,
+        status: "FAILED",
+      }));
+    }
+  }
+
+  React.useEffect(() => {
+    if (!state.lastRunId) return;
+
+    let isActive = true;
+
+    const interval = window.setInterval(async () => {
+      try {
+        const run = await o6.getRun(state.lastRunId as string);
+
+        if (!isActive) return;
+
+        const status = run.status;
+
+        if (status === "PENDING" || status === "RUNNING") {
+          setState((s) => ({
+            ...s,
+            status,
+            loading: true,
+          }));
+          return;
+        }
+
+        if (status === "SUCCEEDED") {
+          setState((s) => ({
+            ...s,
+            status: "SUCCEEDED",
+            loading: false,
+          }));
+          window.clearInterval(interval);
+          return;
+        }
+
+        if (status === "FAILED") {
+          setState((s) => ({
+            ...s,
+            status: "FAILED",
+            loading: false,
+          }));
+          window.clearInterval(interval);
+        }
+      } catch {
+        if (!isActive) return;
+
+        setState((s) => ({
+          ...s,
+          status: "NOT_FOUND",
+          loading: false,
+        }));
+
+        window.clearInterval(interval);
+      }
+    }, 2500);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(interval);
+    };
+  }, [state.lastRunId, o6]);
+
+  return (
+    <div style={{ border: "1px solid #ccc", padding: 16 }}>
+      <h2>Statistical Stage</h2>
+
+      <div style={{ marginBottom: 12 }}>
+        <label>Root Artifact Reference</label>
+        <ArtifactSelector
+          available={availableRootArtifacts}
+          selected={state.selectedRootArtifactRef}
+          onSelect={(ref) => {
+            setRootArtifactInput(ref);
+            setState((s) => ({
+              ...s,
+              selectedRootArtifactRef: ref,
+            }));
+          }}
+          onManualChange={(ref) => {
+            setRootArtifactInput(ref ?? { tool_id: "", fingerprint: "" });
+            setState((s) => ({
+              ...s,
+              selectedRootArtifactRef: ref,
+            }));
+          }}
+        />
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <label>Config (JSON)</label>
+        <textarea
+          value={configText}
+          onChange={(e) => setConfigText(e.target.value)}
+          rows={6}
+          style={{ width: "100%" }}
+        />
+      </div>
+
+      <button onClick={handleSubmit} disabled={state.loading}>
+        Run Statistical Stage
+      </button>
+
+      {state.selectedRootArtifactRef ? (
+        <div style={{ marginTop: 16, border: "1px solid #ccc", padding: 12 }}>
+          <strong>Lineage</strong>
+          <div>Derived from Root Artifact</div>
+        </div>
+      ) : null}
+
+      <div style={{ marginTop: 16 }}>
+        <StepStatusBanner
+          status={state.status}
+          loading={state.loading}
+          error={state.error}
+          lastRunId={state.lastRunId}
+        />
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <div style={{ marginBottom: 8 }}>
+          <strong>Selected root artifact</strong>
+        </div>
+        <ArtifactRefBadge
+          artifactRef={state.selectedRootArtifactRef}
+          origin="root"
+          copyable
+        />
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <div style={{ marginBottom: 8 }}>
+          <strong>Produced statistical artifact</strong>
+        </div>
+        <ArtifactRefBadge
+          artifactRef={state.artifactRef}
+          origin="statistical"
+          copyable
+        />
+      </div>
+    </div>
+  );
+}
