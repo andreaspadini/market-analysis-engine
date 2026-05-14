@@ -1,6 +1,7 @@
 # Market Analysis Engine
 
 Replica pulita e funzionante del progetto originale.
+Questo documento descrive il setup minimo per il run pulito.
 
 ## Struttura
 
@@ -43,7 +44,7 @@ datasets/market_data/MNQ/5m/data_2025.txt
 ## Backend Start
 
 ```powershell
-$env:MARKET_DATA_ROOT="C:\Users\spad7\Desktop\market_analysis_engine\datasets\market_data"
+$env:MARKET_DATA_ROOT="./datasets/market_data"
 
 uvicorn backend.orchestrator.src.api.http.app_factory:create_app --factory --port 8000
 ```

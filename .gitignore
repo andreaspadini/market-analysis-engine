@@ -1,18 +1,69 @@
+# Python
 .venv/
-node_modules/
+venv/
 
 __pycache__/
 *.pyc
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Frontend
+node_modules/
 
 dist/
 build/
 .cache/
 coverage/
 
+# Temporary
 tmp/
 temp/
 
+# Runtime exports / artifacts
+exports/runtime/
+artifacts/
+runs/
+
+# Logs
+*.log
+
+# Environment / secrets
+.env
+.env.*
+*.pem
+*.key
+secrets.json
+credentials.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local env
+.env
+.env.*
+!.env.example
+
+# Runtime / generated artifacts
+.orchestrator/
+artifacts/
+runs/
+exports/
 exports/runtime/
 
-*.log
+# Data
+datasets/
+*.parquet
+*.csv
+
+# Backups
+*.bak
+*.bak-*
+*.bak.*
+
+readmerun.md

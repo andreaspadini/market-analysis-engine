@@ -1,422 +1,788 @@
-GUI v2.0 — Stepwise Workspace Architecture (Post G4.10A)
-
-This package contains the full GUI execution client for the orchestrator runtime.
-
-The system has evolved from a simple run launcher into a fully stepwise, artifact-driven, contract-aligned execution workspace.
-
-It now includes:
-
-Design System & Layout Foundation (G1)
-Run Creation + O6 Submit Integration (G2 / G2.3 / G2.4)
-Run Status Polling (G3.1)
-Results Snapshot Fetch (G3.2)
-Results Visualization Layer (G3.3)
-Stepwise Workspace Architecture (G4.3)
-Root Visualization Layer (G4.4)
-Balance Visualization Refinement (G4.5)
-Query Visualization Layer (G4.6)
-Pattern Tool + Workspace Navigation Refactor (G4.7 / G4.7A)
-Statistical Visualization Layer (G4.9)
-Root Runtime Canonical Alignment (G4.10)
-Root Breakout Canonical GUI Completion (G4.10A)
-Scope
-G1 — Foundation
-Includes
-App shell (header, sidebar, layout)
-Stable routing
-Neutral design system
-Layout primitives
-Print-safe CSS foundation
-Skeleton loader
-UI-level ErrorBoundary
-Explicitly excludes
-Engine logic
-Runtime orchestration
-Planner logic
-Global state manager
-API integration (initially)
-G2 — Run Creation + O6 Integration
-Includes
-Production runner (apps/gui-web)
-Run Creation page (/run/new)
-Preset management (localStorage)
-HTTP integration with O6 (POST /runs)
-Provider-based baseUrl injection
-Redirect to /results/:runId
-Excludes
-Polling
-Streaming
-Artifact rendering
-Planner logic
-Runtime orchestration
-G2.3 — Full Parameter Form Rendering (DTO-Driven)
-Includes
-Full PipelineParametersV1 state model
-Strict DTO mapper
-Structured parameter sections:
-Dataset
-Root Engine
-Statistical Engine
-Query Engine
-Pattern Engine (Pattern Tool only)
-Strict preset storage (DTO JSON)
-Strict O6 contract submission
-Excludes
-Planner logic
-Runtime logic
-Engine logic
-Hashing
-Artifact rendering
-
-GUI acts exclusively as a declarative contract builder.
-
-G2.4 — Configuration Usability & Execution Readiness
-Includes
-Single source of truth (RunCreationState)
-Removal of fragmented local state
-Explicit state injection into sections
-Correct UI → DTO wiring
-Reliable CTA gating
-Preset lifecycle fully validated
-UX improvements
-Reduced manual errors
-Controlled inputs
-Clear required vs optional separation
-Validated behavior
-Full configuration → CTA enabled
-Submit → POST /runs triggered
-Navigation flow executed
-Known limitation
-
-Requires:
-
-VITE_O6_BASE_URL
-G3.1 — Run Status & Polling
-Includes
-GET /runs/{run_id}
-Polling (2500ms)
-Stop on terminal state
-Cleanup
-Excludes
-Streaming
-WebSockets
-Retry logic
-Artifact rendering
-G3.2 — Results Snapshot Fetch
-Includes
-GET /runs/{run_id}/results
-Fetch only on SUCCEEDED
-Single fetch
-ResultsSnapshotView
-Excludes
-Charts
-Aggregations
-Transformations
-G3.3 — Results Visualization Layer
-Completed
-Root View
-Statistical View
-Query View
-Rules
-No interpretation
-No derived logic
-No enrichment
-G4.3 — Stepwise Workspace Architecture
-
-Introduces the new workspace model:
-
-/workspace → stepwise execution
-Stages
-Root → /runs/root
-Statistical → /runs/statistical
-Query → /runs/query
-Principles
-stage isolation
-explicit execution
-artifact-driven chaining
-contract-driven UI
-no shared implicit state
-
-GUI becomes:
-
-thin orchestration client
-G4.4 — Root Visualization Layer
-
-Introduces external, artifact-driven visualization for Root.
-
-New Routes
-/workspace/root/:toolId/:fingerprint/results
-/workspace/root/:toolId/:fingerprint/charts
-Root Results Page
-
-Includes:
-
-Manifest read
-Artifact CSV fetch
-Summary metrics:
-Total
-Failed
-Success
-Up
-Down
-Summary chart
-Breakout table
-Minimal UI
-Failed highlighting
-First 100 rows
-Root Charts Page
-
-Includes:
-
-Data sources
-root_input_dataset.csv
-root_output_dataset.csv
-
-resolved via:
-
-GET /manifests/{tool_id}/{fingerprint}
-GET /artifacts/{tool_id}/{fingerprint}/{relpath}
-Visualization
-OHLC candlestick chart
-breakout overlay
-failed breakout overlay
-initial balance overlay
-
-Library:
-
-lightweight-charts
-G4.5 — Balance Visualization Refinement
-Includes
-improved balance rendering
-better balance boundaries visualization
-midpoint alignment
-cleaner breakout/balance relationship
-chart rendering stabilization
-
-GUI remains artifact-driven only.
-
-No engine reconstruction introduced.
-
-G4.6 — Query Visualization Layer
-
-Introduces inline Query execution results and external visualization support.
-
-Includes
-guided query UX
-intent catalog
-inline query execution rendering
-external query result visualization
-route-driven query results
-public intent exposure
-query result isolation from runtime execution
-Principles
-query is contract-driven
-GUI does not interpret intent semantics
-backend remains source of truth
-G4.7 / G4.7A — Pattern Tool + Workspace Navigation Refactor
-
-Introduces standalone Pattern Tool execution and dedicated visualization.
-
-Includes
-standalone Pattern Tool execution
-dedicated workspace navigation
-Pattern Tool card
-Pattern result visualization
-pattern artifact routing
-artifact-driven chart visualization
-OHLC dataset exposure for Pattern drill-down
-Alignment
-
-Fully aligned with:
-
-O7.12 + O7.13
-
-real engine exports.
-
-No fake visualization.
-
-No synthetic reconstruction.
-
-G4.9 — Statistical Visualization Layer
-
-Introduces artifact-driven visualization for Statistical stage.
-
-Includes
-statistical artifact loading
-statistical result table rendering
-bucketizer metadata visualization
-grouped aggregation rendering
-breakout outcome alignment
-canonical statistical payload visualization
-explicit Root → Statistical chaining
-Guarantees
-
-GUI renders:
-
-only backend-produced outputs
-
-without recomputation.
-
-G4.10 — Root Runtime Canonical Alignment
-
-Root GUI aligned with backend canonical runtime payload.
-
-Includes
-
-Removal of legacy payload structure:
-
-dataset.date_range
-config.engine
-config.duration
-config.volume
-config.delta
-legacy breakout blocks
-legacy export blocks
-legacy rotation blocks
-
-Replacement with canonical runtime payload:
-
-dataset.start_date
-dataset.end_date
-dataset.instrument
-dataset.timeframe
-
-config.rotations
-config.balance
-config.breakout
-config.session_levels
-
-Strict backend validation compatibility:
-
-extra = forbid
-
-No legacy drift remains.
-
-G4.10A — Root Breakout Canonical GUI Completion
-
-Completes the canonical Breakout GUI exposure.
-
-Includes
-Structural repair
-full JSX repair
-Grid / Stack / Collapsible stabilization
-removal of broken nesting
-compile-safe RootWorkspaceCard
-Rotation alignment
-min_rotation_bars
-whipsawBars
-corrected minRotationAmplitude
-corrected minRotationAmplitudeMicro
-Breakout completion
-
-Reintroduced full canonical controls for:
-
-Strength normalization
-ATR
-Volatility filter
-Follow-through
-Placeholder removal
-
-Removed all temporary invalid blocks:
-
-Keep existing block unchanged here
-Validation
-
-Verified with:
-
-npx tsc --noEmit
-
-result:
-
-0 errors
-
-Breakout is now fully canonical and production-safe.
-
-Project Structure
-packages/gui/
-src/
-
-app/
-pages/
-components/
-features/
-
-runCreation/
-runresults/
-workspace/
-
-api/
-
-apps/gui-web/
-Routes
-/run/new
-/results/:runId
-
-/workspace
-/workspace/root
-/workspace/statistical
-/workspace/query
-/workspace/pattern
-
-/workspace/root/:toolId/:fingerprint/results
-/workspace/root/:toolId/:fingerprint/charts
-API Layer Architecture
-createHttpClient
-↓
-createO6Client
-↓
-<ApiProvider>
-↓
-useApi()
-Rules
-no retries
-no interceptors
-explicit injection
-Performance Model
-Execution
-poll → state → fetch → render
-Visualization
-artifact fetch → parse → render
-No
-streaming
-live sync
-DEV Configuration
-apps/gui-web/.env.local
-VITE_O6_BASE_URL=http://127.0.0.1:8000
-
-Required:
-
-backend running
-CORS enabled
-Architectural Boundaries
-
-GUI does NOT:
-
-interpret engine semantics
-compute identity
-reconstruct planner logic
-execute runtime
-mutate execution state
-infer hidden config
-simulate backend logic
-
-GUI is:
-
-pure contract-driven artifact consumer
-Status
-G1 — Closed
-G2 — Closed
-G2.3 — Closed
-G2.4 — Closed
-G3.1 — Closed
-G3.2 — Closed
-G3.3 — Closed
-G4.3 — Closed
-G4.4 — Closed
-G4.5 — Closed
-G4.6 — Closed
-G4.7 — Closed
-G4.7A — Closed
-G4.9 — Closed
-G4.10 — Closed
-G4.10A — Closed
+# GUI — Visual Orchestration Layer
+
+## Overview
+
+La GUI del progetto non nasce come semplice frontend React.
+
+Non è stata progettata come dashboard indipendente, né come applicazione business-logic centrica.
+
+La GUI rappresenta invece un:
+
+```
+`Visual Orchestration Layer`
+```
+
+sopra l’orchestrator artifact-driven.
+
+Il suo compito principale non è “calcolare”, ma:
+
+- guidare l’utente;
+
+- coordinare visivamente gli stage;
+
+- costruire pipeline operative;
+
+- mostrare artifact e manifest;
+
+- accompagnare l’esecuzione runtime;
+
+- rendere leggibile il chaining tra engine.
+
+L’interfaccia è quindi costruita attorno alla pipeline reale del sistema:
+
+```
+`Root`
+
+`→ Statistical`
+
+`→ Query`
+```
+
+Dove ogni stage produce artifact che possono essere immediatamente riutilizzati dal successivo.
+
+
+# Filosofia della GUI
+
+La GUI segue una filosofia molto precisa:
+
+```
+`thin frontend`
+
+`artifact-centric`
+
+`workspace-driven`
+
+`contract-driven`
+```
+
+Questo significa che:
+
+- la logica reale vive nel backend;
+
+- gli engine non vengono eseguiti nel frontend;
+
+- la GUI non “interpreta” semanticamente gli artifact;
+
+- il frontend preserva il contratto dell’orchestrator;
+
+- il chaining viene costruito usando artifact ref reali.
+
+Il frontend non tenta mai di sostituire il runtime backend.
+
+Al contrario:
+
+rende il runtime:
+
+- visibile;
+
+- navigabile;
+
+- leggibile;
+
+- operativo.
+
+
+# Workflow UX
+
+Uno degli aspetti più importanti della GUI è il workflow operativo percepito dall’utente.
+
+L’interfaccia non è stata organizzata come semplice raccolta di pagine separate.
+
+È stata progettata per accompagnare progressivamente la pipeline.
+
+L’utente percepisce chiaramente:
+
+- dove si trova;
+
+- quale stage sta eseguendo;
+
+- quale artifact sta usando;
+
+- quale risultato è stato prodotto;
+
+- come proseguire nello stage successivo.
+
+Questo crea una UX molto più “pipeline-oriented” rispetto a una dashboard tradizionale.
+
+La GUI cerca continuamente di ridurre attrito operativo.
+
+L’obiettivo non è riempire schermate di controlli.
+
+L’obiettivo è:
+
+```
+`rendere leggibile la pipeline reale`
+```
+
+
+# Configurazione Pipeline
+
+## Dataset come punto di partenza
+
+Ogni esecuzione parte dalla definizione del dataset.
+
+La GUI permette di configurare:
+
+- strumenti;
+
+- timeframe;
+
+- date range.
+
+Questa fase rappresenta il contesto globale della pipeline.
+
+L’utente costruisce il perimetro operativo prima ancora di scegliere gli engine.
+
+Dal punto di vista UX, questo rende subito chiaro che:
+
+```
+`gli stage lavorano tutti sullo stesso universo dati`
+```
+
+
+## Configurazione Root
+
+Lo stage Root rappresenta il primo livello operativo reale.
+
+Dal frontend l’utente configura:
+
+- rotazioni;
+
+- balance;
+
+- breakout;
+
+- follow-through;
+
+- ranking;
+
+- export;
+
+- session levels.
+
+La GUI espone il contratto canonico dell’engine.
+
+Non introduce semantiche alternative.
+
+Questo è un aspetto architetturale fondamentale:
+
+```
+`la GUI non reinventa il backend`
+```
+
+ma ne riflette direttamente la struttura.
+
+Dal punto di vista dell’utente, questo crea una sensazione molto “diretta”.
+
+Si percepisce chiaramente che:
+
+```
+`la configurazione mostrata è quella reale del runtime`
+```
+
+non una versione “semplificata artificialmente”.
+
+
+## Configurazione Statistical
+
+Una volta prodotto un artifact Root, la GUI permette di passarlo direttamente allo stage Statistical.
+
+Qui l’esperienza utente cambia.
+
+Il frontend smette di essere solamente “configurazione”.
+
+Diventa:
+
+```
+`workspace operativo`
+```
+
+L’utente vede:
+
+- artifact disponibili;
+
+- stato dello stage;
+
+- collegamenti tra output e input;
+
+- continuità della pipeline.
+
+Statistical lavora quindi come naturale prosecuzione di Root.
+
+La GUI accompagna questa transizione in modo molto fluido.
+
+Esempio operativo:
+
+```
+`L’utente completa Root.`
+
+`La GUI riceve:`
+
+`- run\_id`
+
+`- artifact ref`
+
+
+`Il workspace salva automaticamente il riferimento.`
+
+
+`Statistical viene precompilato.`
+
+
+`L’utente vede immediatamente:`
+
+`- artifact disponibile`
+
+`- badge identificativo`
+
+`- possibilità di continuare la pipeline`
+```
+
+Questo rende il sistema estremamente tangibile.
+
+
+## Configurazione Query
+
+La parte Query rende la pipeline ancora più concreta.
+
+L’utente non lavora più solo su configurazioni runtime.
+
+Lavora direttamente su:
+
+```
+`risultati statistici già materializzati`
+```
+
+La GUI rende molto evidente questa transizione.
+
+L’esperienza percepita diventa:
+
+```
+`analisi iterativa`
+```
+
+più che semplice submit di job.
+
+La pipeline evolve quindi da:
+
+```
+`execution flow`
+```
+
+verso:
+
+```
+`exploration flow`
+```
+
+
+# Artifact Visualization
+
+## Artifact come elemento centrale
+
+La GUI ruota completamente attorno agli artifact.
+
+Gli artifact non vengono trattati come semplici file.
+
+Sono invece:
+
+- output ufficiali della pipeline;
+
+- punti di collegamento tra stage;
+
+- identità operative persistenti;
+
+- riferimenti runtime.
+
+Ogni artifact viene mostrato usando:
+
+```
+`tool\_id`
+
+`fingerprint`
+```
+
+che rappresentano il contratto reale dell’orchestrator.
+
+Questo rende molto chiaro all’utente che:
+
+```
+`gli output non sono “temporanei”`
+```
+
+ma rappresentano elementi reali della pipeline.
+
+
+## Chaining visuale
+
+Uno degli aspetti più riusciti della GUI è il chaining visuale.
+
+Esempio reale:
+
+```
+`L’utente esegue Root.`
+
+`La GUI riceve:`
+
+`- run\_id`
+
+`- artifact ref`
+
+
+`Lo stato workspace salva il riferimento.`
+
+
+`Statistical viene automaticamente precompilato.`
+
+
+`L’utente vede immediatamente:`
+
+`- artifact disponibile`
+
+`- badge identificativo`
+
+`- possibilità di aprire risultati`
+
+`- possibilità di continuare la pipeline`
+```
+
+Questa esperienza rende il sistema molto più concreto e leggibile.
+
+L’utente percepisce chiaramente che:
+
+```
+`uno stage sta alimentando il successivo`
+```
+
+
+## Artifact Selector
+
+L’Artifact Selector è il punto in cui il chaining diventa esplicito.
+
+L’utente può:
+
+- usare artifact appena prodotti;
+
+- inserire manualmente artifact ref;
+
+- ricollegare stage precedenti;
+
+- lavorare su pipeline diverse.
+
+La GUI quindi non impone un flusso rigido.
+
+Permette una vera orchestrazione visuale.
+
+Questo è particolarmente importante perché il frontend non “risolve semanticamente” gli artifact.
+
+Passa semplicemente:
+
+```
+`tool\_id + fingerprint`
+```
+
+all’orchestrator.
+
+Ed è il backend a risolvere il riferimento reale.
+
+
+# Workspace UX
+
+## Workspace come centro della GUI
+
+Il vero cuore del frontend non è la pagina Results.
+
+È il Workspace.
+
+Il workspace rappresenta:
+
+```
+`la pipeline viva`
+```
+
+L’utente non percepisce più stage isolati.
+
+Percepisce invece:
+
+- continuità;
+
+- propagazione artifact;
+
+- avanzamento operativo;
+
+- coordinazione runtime.
+
+Questo è il motivo per cui il progetto definisce la GUI come:
+
+```
+`Visual Orchestration Layer`
+```
+
+più che semplice frontend.
+
+
+## Root → Statistical
+
+Uno dei flow più importanti è:
+
+```
+`Root → Statistical`
+```
+
+Flow operativo percepito:
+
+```
+`1. L’utente configura Root`
+
+`2. Esegue la run`
+
+`3. La GUI mostra stato runtime`
+
+`4. Root produce artifact`
+
+`5. Lo stato workspace salva artifact ref`
+
+`6. Statistical viene precompilato`
+
+`7. L’utente continua senza reinserire dati`
+```
+
+Questo riduce enormemente attrito operativo.
+
+La pipeline appare continua.
+
+
+## Statistical → Query
+
+Il passaggio Query è ancora più interessante.
+
+Qui la GUI accompagna una trasformazione concettuale:
+
+```
+`da execution pipeline`
+
+`a exploration pipeline`
+```
+
+L’utente comincia a lavorare direttamente sui risultati statistici.
+
+La GUI rende questa transizione molto naturale.
+
+Esempio:
+
+```
+`Statistical produce aggregazioni.`
+
+`Query riceve automaticamente l’artifact.`
+
+`L’utente può immediatamente:`
+
+`- lanciare ranking`
+
+`- confrontare gruppi`
+
+`- iterare query`
+
+`- leggere insight`
+```
+
+
+# Results System
+
+## Polling Runtime
+
+La pagina Results utilizza polling runtime.
+
+La GUI controlla periodicamente lo stato della run.
+
+Esempio:
+
+```
+`RUNNING`
+
+`→ RUNNING`
+
+`→ SUCCEEDED`
+```
+
+Questo permette all’utente di percepire:
+
+- avanzamento;
+
+- stato runtime;
+
+- successo/fallimento;
+
+- disponibilità dei risultati.
+
+L’esperienza è molto più “runtime-aware” rispetto a una semplice pagina statica.
+
+
+## Snapshot Results
+
+I risultati vengono mostrati tramite snapshot aggregati.
+
+La GUI non ricostruisce il runtime internamente.
+
+Mostra semplicemente:
+
+```
+`lo snapshot prodotto dall’orchestrator`
+```
+
+Questo mantiene frontend e backend semanticamente allineati.
+
+
+## Root Results
+
+La sezione Root visualizza:
+
+- eventi;
+
+- breakout;
+
+- balance;
+
+- dettagli nested;
+
+- summary cards.
+
+L’esperienza è molto più vicina a:
+
+```
+`navigazione runtime`
+```
+
+che a semplice rendering JSON.
+
+La GUI cerca continuamente di trasformare output tecnici in:
+
+```
+`navigazione leggibile`
+```
+
+
+## Statistical Results
+
+La parte Statistical enfatizza:
+
+- distribuzioni;
+
+- aggregazioni;
+
+- summary;
+
+- nested blocks;
+
+- visualizzazione tabellare.
+
+Qui la GUI rende il lato quantitativo molto leggibile.
+
+L’utente percepisce chiaramente:
+
+- densità dati;
+
+- bucket;
+
+- ranking;
+
+- distribuzioni;
+
+- differenze statistiche.
+
+
+## Query Results
+
+La sezione Query trasforma il risultato in:
+
+- ranking;
+
+- insight;
+
+- differenze tra gruppi;
+
+- overview operative.
+
+La GUI accompagna l’utente nella lettura del risultato.
+
+Non si limita a mostrare dati grezzi.
+
+Esempio percepito:
+
+```
+`“quale gruppo performa meglio?”`
+
+`“quale configurazione è più debole?”`
+
+`“quanto cambia il risultato?”`
+```
+
+La lettura diventa molto più intuitiva.
+
+
+# API Layer
+
+## Thin Typed Client
+
+La GUI usa un client tipizzato sopra l’orchestrator.
+
+Questo layer:
+
+- centralizza endpoint;
+
+- centralizza DTO;
+
+- preserva i contratti;
+
+- evita fetch sparsi.
+
+La GUI si comporta quindi come:
+
+```
+`thin typed client`
+```
+
+sopra il backend.
+
+
+## DTO Contract
+
+I payload frontend rispettano il contratto reale backend.
+
+Questo è estremamente importante.
+
+Il frontend:
+
+- non rinomina campi;
+
+- non normalizza semantiche;
+
+- non aggiunge runtime logic;
+
+- non altera gli artifact.
+
+Preserva la struttura canonica del sistema.
+
+Questo mantiene:
+
+```
+`frontend e orchestrator semanticamente allineati`
+```
+
+
+# Architettura Frontend
+
+## packages/gui
+
+Contiene la logica reale del frontend:
+
+- workspace;
+
+- routing;
+
+- API;
+
+- results;
+
+- componenti;
+
+- orchestration flow.
+
+È il cuore dell’interfaccia.
+
+
+## apps/gui-web
+
+Host app dedicata al runtime browser.
+
+Serve principalmente a:
+
+- montare la GUI;
+
+- avviare Vite;
+
+- configurare runtime web.
+
+
+## apps/gui-dev
+
+Host dedicato allo sviluppo locale.
+
+Permette:
+
+- test veloci;
+
+- preview;
+
+- sviluppo isolato;
+
+- debug frontend.
+
+
+# Filosofia Visuale
+
+La GUI non cerca di apparire “enterprise dashboard”.
+
+L’obiettivo reale è:
+
+```
+`rendere leggibile la pipeline`
+```
+
+Per questo l’interfaccia enfatizza:
+
+- flow verticale;
+
+- continuità stage;
+
+- artifact chaining;
+
+- stato runtime;
+
+- navigazione operativa.
+
+L’utente percepisce chiaramente che il sistema sta:
+
+```
+`costruendo una pipeline reale`
+```
+
+non semplicemente compilando form.
+
+
+# Conclusione
+
+La GUI rappresenta uno dei layer più importanti del progetto perché rende tangibile l’intera architettura artifact-driven.
+
+Senza il frontend:
+
+- gli artifact rimarrebbero invisibili;
+
+- il chaining sarebbe astratto;
+
+- il runtime sarebbe opaco;
+
+- la pipeline sarebbe difficile da seguire.
+
+La GUI trasforma invece:
+
+```
+`engine + orchestrator`
+```
+
+in un workflow operativo leggibile.
+
+Per questo la definizione corretta del frontend non è:
+
+```
+`“semplice frontend React”`
+```
+
+ma:
+
+```
+`Visual Orchestration Layer`
+```
+
+sopra un sistema runtime artifact-driven.
+
