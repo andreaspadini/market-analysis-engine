@@ -1,106 +1,172 @@
 # Market Analysis Engine (MAE)
 
-Market Analysis Engine (MAE) is a modular software platform designed for quantitative and statistical market analysis.
+A modular, artifact-driven software platform for quantitative market analysis.
 
-Rather than focusing on automated trading, MAE is built as a research-oriented environment that allows analysts to detect market structures, perform statistical analysis, compare historical behaviours, and progressively enrich analytical datasets through independent processing engines.
+Market Analysis Engine (MAE) is a long-term software engineering project designed to support reproducible market research through independent analytical engines rather than automated trading.
 
-The project has been developed following a strongly iterative and AI-assisted software engineering workflow, with particular emphasis on software architecture, modularity, contract-driven development and maintainability.
+Instead of producing trading signals, MAE focuses on identifying market structures, enriching them with statistical information, discovering historical similarities, and exposing the resulting knowledge through dedicated analytical services.
+
+The project has been developed following an iterative AI-assisted engineering workflow, with a strong emphasis on software architecture, modularity, maintainability and long-term scalability.
 
 ---
 
-# Why this project exists
+# Project Goals
 
-Most market analysis software focuses on generating trading signals.
+MAE has been designed around a simple idea:
 
-MAE follows a different philosophy.
+**Build an analytical platform where every processing step is reproducible, inspectable and independently evolvable.**
 
-The objective is to build an extensible analytical platform where every processing step is reproducible, inspectable and independently evolvable.
-
-The system has been designed around software engineering principles such as:
+The architecture intentionally prioritizes:
 
 - Separation of Responsibilities
-- Low Coupling
 - High Cohesion
+- Low Coupling
 - Contract-Driven Development
 - Artifact-Based Processing
-- Modular Architecture
-- Reproducible Analysis Pipelines
+- Runtime Orchestration
+- Reproducible Analytical Pipelines
+
+rather than maximizing raw execution speed.
+
+---
+
+# Architecture Overview
+
+The platform is composed of independent software components coordinated by a runtime orchestrator.
+
+```text
+                         GUI
+                          │
+                          ▼
+                   FastAPI Backend
+                          │
+                          ▼
+                    Orchestrator
+                          │
+          ┌───────────────┼────────────────┐
+          │               │                │
+          ▼               ▼                ▼
+
+     Root Engine    Statistical Engine   Query Engine
+          │               │                │
+          ▼               ▼                ▼
+
+   Root Artifact  Statistical Artifact  Final Report
+
+
+                  Independent Workflow
+                          │
+                          ▼
+
+                  Pattern Engine
+                          │
+                          ▼
+
+                  Pattern Matches
+```
+
+The Root → Statistical → Query pipeline represents the primary analytical workflow.
+
+The Pattern Engine is an independent analytical module dedicated to historical similarity analysis, allowing current market structures to be compared with historical datasets without affecting the primary pipeline.
+
+Each engine owns a single responsibility and communicates through versioned artifacts instead of direct implementation dependencies.
+
+---
+
+# Main Components
+
+## Root Engine
+
+Detects analytical market events such as balances, breakouts and other market structures starting from raw market data.
+
+---
+
+## Statistical Engine
+
+Consumes Root artifacts and enriches detected events with statistical information and derived analytical features.
+
+---
+
+## Query Engine
+
+Provides analytical reporting capabilities over generated datasets, allowing structured exploration of statistical results.
+
+---
+
+## Pattern Engine
+
+Dedicated historical similarity engine.
+
+Its purpose is to compare current market structures with historical datasets in order to identify similar market behaviour and support exploratory market analysis.
+
+Unlike the primary execution pipeline, the Pattern Engine operates as an independent analytical workflow.
+
+---
+
+## Orchestrator
+
+Coordinates engine execution.
+
+Responsibilities include:
+
+- pipeline orchestration
+- engine registration
+- runtime coordination
+- artifact routing
+- dependency management
+
+Individual engines never know which component will consume their output.
+
+---
+
+## GUI
+
+React-based graphical interface exposing the platform through a user-friendly frontend.
 
 ---
 
 # Key Features
 
 - Modular multi-engine architecture
-- Breakout detection engine
-- Statistical enrichment engine
-- Pattern recognition engine
-- Query engine
-- Runtime orchestration layer
-- Artifact-based workflow
-- Dataset processing pipeline
-- External configuration support
-- React/TypeScript graphical interface
-- AI-assisted development workflow
-
----
-
-# Architecture Overview
-
-The platform is organized as independent software components coordinated by a runtime orchestrator.
-
-```text
-GUI
-    │
-    ▼
-FastAPI Backend
-    │
-    ▼
-Orchestrator
-    │
-    ├───────────────► Root Engine
-    │                     │
-    │                     ▼
-    │               Root Artifact
-    │                     │
-    │                     ▼
-    │            Statistical Engine
-    │                     │
-    │                     ▼
-    │           Statistical Artifact
-    │                     │
-    │                     ▼
-    │              Query Engine
-    │                     │
-    │                     ▼
-    │              Final Results
-```
-
-Each engine has a single responsibility and communicates through versioned artifacts rather than direct implementation dependencies.
+- Runtime orchestration
+- Contract-driven communication
+- Artifact-based analytical workflow
+- Historical pattern similarity analysis
+- Statistical enrichment pipeline
+- External YAML configuration
+- Dataset-driven analysis
+- React + FastAPI architecture
+- AI-assisted software engineering workflow
 
 ---
 
 # Technology Stack
 
-Backend
+## Backend
 
 - Python
 - FastAPI
 - Pydantic
 
-Frontend
+## Frontend
 
 - React
 - TypeScript
 
-Architecture
+## Architecture
 
-- Contract-Driven Design
-- Artifact-Based Processing
+- Modular Design
+- Contract-Driven Development
 - Runtime Orchestration
-- Modular Engines
-- Dataset Pipelines
+- Artifact-Based Processing
+- Independent Analytical Engines
 
-Development
+## Configuration
+
+- YAML
+- External runtime configuration
+
+## Development
 
 - Git
 - GitHub
@@ -113,73 +179,79 @@ Development
 ```text
 market-analysis-engine/
 
-├── Root Engine
-├── Statistical Engine
-├── Pattern Engine
-├── Query Engine
-├── Orchestrator
-├── GUI
-├── Documentation
-├── Configurations
-└── Runtime Artifacts
+├── backend/
+├── engines/
+│   ├── Root Engine
+│   ├── Statistical Engine
+│   ├── Pattern Engine
+│   └── Query Engine
+├── apps/
+├── packages/
+├── datasets/
+├── documentation/
+└── runtime artifacts/
 ```
 
 ---
 
 # Running the Project
 
-A complete setup guide is available here:
+Complete setup instructions are available in:
 
 **RUNNING.md**
 
 The document includes:
 
-- installation
-- project setup
-- environment configuration
-- execution examples
+- environment setup
+- Python installation
+- frontend installation
+- dataset configuration
+- backend startup
 - GUI startup
 - development workflow
 
 ---
 
-# What I Learned While Building This Project
+# What I Learned While Building MAE
 
-Building MAE has been an opportunity to deepen several software engineering concepts beyond programming itself.
+MAE has been much more than a programming project.
 
-Main topics explored include:
+It has been an opportunity to study and apply software engineering principles in a real-world architectural context.
+
+Key topics explored during development include:
 
 - modular software architecture
 - separation of responsibilities
-- orchestration systems
-- API design
 - contract-driven development
+- runtime orchestration
 - artifact lifecycle management
-- software scalability
+- scalable backend systems
+- API design
+- historical data processing
 - architectural trade-offs
-- iterative software design
-- AI-assisted software development
+- AI-assisted software engineering
+
+Above all, the project taught me how architectural decisions influence maintainability, extensibility and long-term software evolution.
 
 ---
 
 # Current Status
 
-MAE is an active long-term project currently under continuous development.
+MAE is an active long-term project under continuous development.
 
-The platform continues to evolve through incremental improvements, architectural refinements and new analytical engines.
+Current work focuses on:
 
-Future work includes:
-
-- additional analytical modules
-- improved dataset management
-- expanded statistical capabilities
-- advanced reporting
-- further GUI evolution
+- architectural refinement
+- analytical engine evolution
+- GUI improvements
+- runtime enhancements
+- statistical capabilities
+- future analytical modules
 
 ---
 
 # Repository
 
-This repository represents an ongoing engineering project focused on software architecture, modular backend systems and quantitative analysis workflows.
+This repository showcases an ongoing software engineering project focused on modular backend architecture, quantitative analysis and AI-assisted software development.
 
 Suggestions, discussions and constructive feedback are always welcome.
