@@ -1,3 +1,8 @@
+![Python](https://img.shields.io/badge/Python-3.x-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
+![React](https://img.shields.io/badge/React-Frontend-blue)
+![Status](https://img.shields.io/badge/Status-Active-success)
+
 # Market Analysis Engine (MAE)
 
 A modular, artifact-driven software platform for quantitative market analysis.
@@ -234,6 +239,21 @@ Key topics explored during development include:
 Above all, the project taught me how architectural decisions influence maintainability, extensibility and long-term software evolution.
 
 ---
+
+---
+
+# Documentation
+
+Additional documentation is available in the **docs** folder.
+
+| Document | Description |
+|----------|-------------|
+| **ARCHITECTURE.md** | High-level architecture, design principles and system organization. |
+| **ENGINEERING_DECISIONS.md** | Main architectural decisions, design trade-offs and engineering rationale. |
+| **RUNNING.md** | English setup and execution guide. |
+| **RUNNING.it.md** | Italian setup and execution guide. |
+| **ROADMAP.md** | Planned features and project evolution. |
+| **CHANGELOG.md** | Project history and version changes. |
 
 # Current Status
 
